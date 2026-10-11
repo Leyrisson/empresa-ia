@@ -15,7 +15,7 @@ import os
 import re
 import unicodedata
 
-from . import config, db, conhecimento, empacotar, llm
+from . import config, db, conhecimento, empacotar, llm, reuniao
 from .setores import ESTAGIOS, FUNCIONARIOS, ORDEM, setor_do_estagio, proximo_estagio, progresso
 
 GERENTE = "gerencia"
@@ -189,6 +189,12 @@ def _avancar(p: dict, tarefa: dict, parcial: bool = False) -> None:
         db.mensagem(GERENTE, "marketing",
                     f"«{p['nome']}» concluído e lançado! Colher métricas.",
                     tipo="anuncio", produto_id=p["id"])
+        try:
+            reuniao.agendar(produto_id=p["id"],
+                            titulo=f"Pós-lançamento de «{p['nome']}»",
+                            pauta=f"Colher métricas, empacotar para clientes e vender {p['nome']}.")
+        except Exception:  # noqa: BLE001
+            pass
         log(f"produto lancado: {p['nome']}")
 
 

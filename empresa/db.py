@@ -144,6 +144,19 @@ CREATE INDEX IF NOT EXISTS idx_office_setor    ON office(setor);
 CREATE INDEX IF NOT EXISTS idx_ver_produto     ON verificacoes(produto_id);
 CREATE INDEX IF NOT EXISTS idx_prod_slug       ON produtos(slug);
 CREATE INDEX IF NOT EXISTS idx_prod_estagio    ON produtos(estagio, status);
+CREATE TABLE IF NOT EXISTS reunioes (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo        TEXT,
+    pauta         TEXT,
+    participantes TEXT,
+    status        TEXT DEFAULT 'agendada',
+    produto_id    INTEGER REFERENCES produtos(id),
+    criado_em     TEXT,
+    iniciado_em   TEXT,
+    concluido_em  TEXT,
+    resultado     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_reuniao_status ON reunioes(status);
 """
 
 
@@ -506,6 +519,47 @@ def verificacoes_do_produto(pid: int) -> list[dict]:
             "SELECT * FROM verificacoes WHERE produto_id=? ORDER BY id DESC LIMIT 12", (pid,))]
 
 
+# ---------------- reuniões ----------------
+def criar_reuniao(titulo: str, pauta: str, participantes: list[str],
+                  produto_id: int | None = None) -> int:
+    import json as _json
+    with conectar() as con:
+        cur = con.execute(
+            "INSERT INTO reunioes(titulo,pauta,participantes,status,produto_id,criado_em)"
+            " VALUES(?,?,?, 'agendada',?,?)",
+            (titulo, pauta, _json.dumps(participantes, ensure_ascii=False), produto_id, agora()),
+        )
+        return cur.lastrowid
+
+
+def listar_reunioes(limite: int = 12) -> list[dict]:
+    with conectar() as con:
+        return [dict(r) for r in con.execute(
+            "SELECT * FROM reunioes ORDER BY id DESC LIMIT ?", (limite,))]
+
+
+def reuniao_ativa() -> dict | None:
+    with conectar() as con:
+        r = con.execute(
+            "SELECT * FROM reunioes WHERE status IN ('agendada','ocorrendo') ORDER BY id LIMIT 1"
+        ).fetchone()
+        return dict(r) if r else None
+
+
+def iniciar_reuniao(rid: int) -> None:
+    with conectar() as con:
+        con.execute("UPDATE reunioes SET status='ocorrendo', iniciado_em=? WHERE id=?",
+                    (agora(), rid))
+
+
+def concluir_reuniao(rid: int, resultado: str) -> None:
+    with conectar() as con:
+        con.execute(
+            "UPDATE reunioes SET status='concluida', concluido_em=?, resultado=? WHERE id=?",
+            (agora(), resultado, rid),
+        )
+
+
 # ---------------- mensagens / eventos ----------------
 def mensagem(de: str, para: str, conteudo: str, tipo: str = "info", produto_id: int | None = None) -> int:
     with conectar() as con:
@@ -559,6 +613,8 @@ def snapshot() -> dict:
             "SELECT setor, versao, atualizado_em FROM conhecimento")]
         relatorios = [dict(r) for r in con.execute(
             "SELECT data,titulo,canais FROM relatorios ORDER BY data DESC LIMIT 8")]
+        reunioes = [dict(r) for r in con.execute(
+            "SELECT * FROM reunioes ORDER BY id DESC LIMIT 8")]
     return {
         "config": {
             "pausada": cfg_get("pausada", False) or config.PAUSA.exists(),
@@ -582,4 +638,5 @@ def snapshot() -> dict:
         "office": office,
         "conhecimento": conhecimento,
         "relatorios": relatorios,
+        "reunioes": reunioes,
     }

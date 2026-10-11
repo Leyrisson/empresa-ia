@@ -59,6 +59,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(db.listar_ideias())
         if rota == "/api/relatorios":
             return self._json(db.listar_relatorios())
+        if rota == "/api/reunioes":
+            return self._json(db.listar_reunioes())
         if rota == "/api/conhecimento":
             with db.conectar() as con:
                 return self._json([dict(r) for r in con.execute(
@@ -166,6 +168,16 @@ class Handler(BaseHTTPRequestHandler):
             if not r:
                 return self._json({"erro": "não foi possível gerar"}, 500)
             return self._json({"ok": True, "canais": r["canais"]})
+
+        if rota == "/api/reuniao":
+            from . import reuniao
+            if not db.reuniao_ativa():
+                rid = reuniao.agendar(
+                    titulo=(corpo.get("titulo") or "").strip() or "Alinhamento do dono",
+                    pauta=(corpo.get("pauta") or "").strip()
+                    or "Reunião solicitada pelo dono para discutir os projetos.")
+                return self._json({"ok": True, "reuniao_id": rid})
+            return self._json({"erro": "já há reunião marcada/em andamento"}, 409)
 
         self.send_error(404)
 

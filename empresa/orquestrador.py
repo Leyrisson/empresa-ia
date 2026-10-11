@@ -13,7 +13,7 @@ import sys
 import time
 import traceback
 
-from . import agentes, config, db, obsidian, relatorio
+from . import agentes, config, db, obsidian, relatorio, reuniao
 from .setores import SETORES
 
 _PARAR = False
@@ -57,6 +57,10 @@ def um_ciclo() -> None:
     db.cfg_set("ultimo_tick", db.agora())
     agentes.ciclo_gerente()
     _resumos_no_obsidian()
+    try:
+        db.cfg_set("ultima_reuniao", reuniao.tick())
+    except Exception:  # noqa: BLE001
+        agentes.log("ERRO reuniao: " + traceback.format_exc(limit=2))
     for s in SETORES:
         if _PARAR:
             return
