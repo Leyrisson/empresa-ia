@@ -1,0 +1,17 @@
+# estado de execução (banco, logs, pausa) — nunca versionar
+var/
+produtos/
+*.db
+*.db-wal
+*.db-shm
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ruído
+*.log
+.DS_Store

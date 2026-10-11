@@ -1,0 +1,24 @@
+[Unit]
+Description=Empresa IA - turno de trabalho (agentes de IA em segundo plano)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/empresa-ia
+Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin
+Environment=PYTHONUNBUFFERED=1
+Environment=EMPRESA_INTENSIDADE=baixa
+ExecStart=/usr/bin/python3 -m empresa trabalhar
+# roda em segundo plano sem atrapalhar o uso normal do PC
+Nice=15
+IOSchedulingClass=idle
+CPUWeight=20
+MemoryMax=6G
+Restart=always
+RestartSec=10
+StandardOutput=append:%h/empresa-ia/var/servico.log
+StandardError=append:%h/empresa-ia/var/servico.log
+
+[Install]
+WantedBy=default.target

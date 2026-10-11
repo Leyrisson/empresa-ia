@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Empresa IA — Escritório</title>
+<style>
+  :root{
+    --bg:#0b1020; --bg2:#121a33; --card:#182244; --card2:#1f2b52;
+    --txt:#e8ecff; --dim:#8b96c4; --line:#2a3767; --ok:#4ade80; --warn:#fbbf24;
+    --gold:#f5c542; --accent:#6ea8fe;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+       background:radial-gradient(1200px 700px at 50% -10%,#16224a,#0b1020 60%);color:var(--txt);height:100vh;overflow:hidden}
+  header{display:flex;align-items:center;gap:14px;padding:10px 18px;background:rgba(10,16,36,.85);
+         border-bottom:1px solid var(--line);backdrop-filter:blur(6px);position:relative;z-index:5}
+  header h1{font-size:17px;margin:0;letter-spacing:.4px}
+  header .sub{font-size:12px;color:var(--dim)}
+  .spacer{flex:1}
+  .ctrl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim)}
+  button,select,input{background:var(--card);color:var(--txt);border:1px solid var(--line);
+        border-radius:8px;padding:6px 10px;font-size:12px;font-family:inherit;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:linear-gradient(180deg,#2b57c7,#22409a);border-color:#3b6ae0}
+  .pill{padding:4px 9px;border-radius:999px;font-size:11px;border:1px solid var(--line)}
+  #painel{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 53px)}
+  #andar{position:relative;overflow:hidden;border-right:1px solid var(--line);
+    background:
+      linear-gradient(rgba(110,168,254,.05) 1px,transparent 1px) 0 0/100% 42px,
+      linear-gradient(90deg,rgba(110,168,254,.05) 1px,transparent 1px) 0 0/42px 100%,
+      linear-gradient(180deg,#0e1530,#0b1020)}
+  #svglinhas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .mesa{position:absolute;transform:translate(-50%,-50%);width:190px;background:linear-gradient(180deg,var(--card),var(--card2));
+    border:1px solid var(--line);border-radius:14px;padding:10px 10px 12px;transition:.3s;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+  .mesa.gerente{width:230px;border-color:var(--gold);box-shadow:0 0 0 1px rgba(245,197,66,.35),0 10px 30px rgba(245,197,66,.15)}
+  .mesa.trabalhando{border-color:var(--ok)}
+  .mesa.trabalhando::after{content:"";position:absolute;inset:-1px;border-radius:14px;border:2px solid var(--ok);
+    animation:pulse 1.4s infinite;pointer-events:none}
+  @keyframes pulse{0%{opacity:.9;transform:scale(1)}70%{opacity:0;transform:scale(1.04)}100%{opacity:0}}
+  .mesa .top{display:flex;align-items:center;gap:8px}
+  .mesa .avatar{font-size:22px;filter:drop-shadow(0 2px 3px #000)}
+  .mesa .nome{font-weight:600;font-size:13px;line-height:1.1}
+  .mesa .setor{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .badge{margin-left:auto;font-size:9px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+  .badge.ocioso{color:var(--dim)} .badge.trabalhando{color:#04120a;background:var(--ok);border-color:var(--ok)}
+  .badge.pensando{color:#1a1200;background:var(--warn);border-color:var(--warn)}
+  .tarefa{margin-top:8px;font-size:11px;color:#c9d3f5;height:28px;overflow:hidden}
+  .mesa .monitor{position:absolute;top:8px;right:10px;font-size:12px;opacity:.5}
+  #fluxo{position:absolute;inset:0;pointer-events:none}
+  .msglet{position:absolute;transform:translate(-50%,-50%);font-size:16px;z-index:6;filter:drop-shadow(0 0 6px rgba(110,168,254,.9))}
+  /* sidebar */
+  #lado{display:flex;flex-direction:column;background:#0c1330}
+  .tabs{display:flex;border-bottom:1px solid var(--line)}
+  .tabs button{flex:1;border:0;border-radius:0;background:transparent;padding:10px;color:var(--dim)}
+  .tabs button.on{color:var(--txt);border-bottom:2px solid var(--accent)}
+  .painel-scroll{overflow:auto;flex:1;padding:10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 10px;margin-bottom:8px;font-size:12px}
+  .tipo{font-size:9px;text-transform:uppercase;letter-spacing:.5px;padding:1px 6px;border-radius:6px;margin-right:6px}
+  .tipo.demanda{background:#3b2a63;color:#c9b6ff}.tipo.relatorio{background:#123a2a;color:#7ff0bb}
+  .tipo.resposta{background:#12304a;color:#8fd0ff}.tipo.info{background:#232b46;color:#a7b3e0}
+  .tipo.anuncio{background:#4a3a12;color:#ffd77a}
+  .meta{color:var(--dim);font-size:10px;margin-top:3px}
+  .prog{height:6px;background:#0c1330;border-radius:6px;overflow:hidden;margin-top:6px}
+  .prog>i{display:block;height:100%;background:linear-gradient(90deg,#4ade80,#6ea8fe)}
+  .kv{display:flex;justify-content:space-between;gap:8px;color:var(--dim);font-size:11px;margin-top:4px}
+  .pipeline{display:flex;gap:6px;flex-wrap:wrap;font-size:10px;color:var(--dim);margin:6px 0}
+  .pipeline span{padding:2px 6px;border:1px solid var(--line);border-radius:999px}
+  h4{margin:6px 0 4px;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.7px}
+  .meta-barra{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:4px}
+</style>
+</head>
+<body>
+<header>
+  <div>🏢</div>
+  <div><h1>Empresa IA <span class="sub">— fábrica autônoma de apps web &amp; Android</span></h1></div>
+  <div class="spacer"></div>
+  <div class="ctrl">Intensidade
+    <select id="intensidade">
+      <option value="baixa">baixa (não atrapalha)</option>
+      <option value="media">média</option>
+      <option value="alta">alta</option>
+    </select>
+  </div>
+  <div class="ctrl">Meta MRR R$<input id="meta" type="number" style="width:90px" step="500"></div>
+  <button id="btnNovo" class="primary">+ Novo produto</button>
+  <button id="btnPausar">⏸ Pausar</button>
+  <div class="pill" id="tick">—</div>
+</header>
+
+<div id="painel">
+  <div id="andar">
+    <svg id="svglinhas"></svg>
+    <div id="mesas"></div>
+    <div id="fluxo"></div>
+  </div>
+  <div id="lado">
+    <div class="tabs">
+      <button data-t="feed" class="on">Mural</button>
+      <button data-t="prod">Produtos</button>
+      <button data-t="tar">Tarefas</button>
+    </div>
+    <div class="painel-scroll" id="conteudo"></div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+let estado=null, visto=-1, aba="feed", posCache={}, desenhouLinhas=false;
+
+async function api(rota, dados){
+  const opt = dados ? {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(dados)} : {};
+  const r = await fetch(rota, opt); return r.json();
+}
+
+function corTipo(t){return {demanda:"#c9b6ff",relatorio:"#7ff0bb",resposta:"#8fd0ff",info:"#a7b3e0",anuncio:"#ffd77a"}[t]||"#a7b3e0";}
+
+function centro(setorId){
+  const el = document.querySelector(`.mesa[data-id="${setorId}"]`);
+  if(!el) return null;
+  const a=$("#andar").getBoundingClientRect(), r=el.getBoundingClientRect();
+  return {x:r.left-a.left+r.width/2, y:r.top-a.top+r.height/2};
+}
+
+function desenhaLinhas(setores){
+  const svg=$("#svglinhas"), A=$("#andar").getBoundingClientRect();
+  svg.setAttribute("viewBox",`0 0 ${A.width} ${A.height}`);
+  const g=centro("gerencia"); if(!g) return;
+  let h="";
+  setores.filter(s=>s.id!=="gerencia").forEach(s=>{
+    const c=centro(s.id); if(!c) return;
+    h+=`<line x1="${c.x}" y1="${c.y}" x2="${g.x}" y2="${g.y}" stroke="rgba(110,168,254,.18)" stroke-width="1" stroke-dasharray="4 6"/>`;
+  });
+  svg.innerHTML=h;
+}
+
+function animaMsg(de,para,tipo){
+  const a=centro(de)||centro("gerencia"), b=centro(para)||centro("gerencia");
+  if(!a||!b) return;
+  const el=document.createElement("div");
+  el.className="msglet"; el.textContent="💬";
+  el.style.filter=`drop-shadow(0 0 6px ${corTipo(tipo)})`;
+  el.style.left=a.x+"px"; el.style.top=a.y+"px";
+  $("#fluxo").appendChild(el);
+  const t0=performance.now(), dur=1300;
+  (function passo(t){
+    const k=Math.min(1,(t-t0)/dur);
+    const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    el.style.left=(a.x+(b.x-a.x)*e)+"px";
+    el.style.top=(a.y+(b.y-a.y)*e-18*Math.sin(Math.PI*e))+"px";
+    el.style.opacity=1-k*0.7;
+    if(k<1) requestAnimationFrame(passo); else el.remove();
+  })(t0);
+}
+
+function renderMesas(setores,funcs){
+  const box=$("#mesas");
+  if(!box.dataset.pronto){
+    box.innerHTML="";
+    setores.forEach(s=>{
+      const f=funcs[s.id]||{};
+      const d=document.createElement("div");
+      d.className="mesa"+(s.papel==="gerente"?" gerente":"");
+      d.dataset.id=s.id;
+      d.style.left=s.mesa_x+"%"; d.style.top=s.mesa_y+"%";
+      d.style.borderTopColor=s.cor;
+      d.innerHTML=`
+        <div class="monitor">🖥️</div>
+        <div class="top">
+          <div class="avatar" style="color:${s.cor}">${f.emoji||s.emoji}</div>
+          <div><div class="nome">${f.nome||s.nome}</div><div class="setor">${s.nome}</div></div>
+          <div class="badge" data-badge></div>
+        </div>
+        <div class="tarefa" data-tarefa></div>`;
+      box.appendChild(d);
+    });
+    box.dataset.pronto="1";
+    setTimeout(()=>desenhaLinhas(setores),60);
+  }
+  setores.forEach(s=>{
+    const f=funcs[s.id]||{}, el=box.querySelector(`.mesa[data-id="${s.id}"]`);
+    if(!el) return;
+    const st=(f.status||"ocioso");
+    el.classList.toggle("trabalhando", st==="trabalhando"||st==="pensando");
+    const b=el.querySelector("[data-badge]"); b.className="badge "+st; b.textContent=st;
+    el.querySelector("[data-tarefa]").textContent=f.tarefa_atual||"—";
+  });
+}
+
+function cardMsg(m){
+  return `<div class="card"><span class="tipo ${m.tipo}">${m.tipo}</span>
+    <b>${m.de}</b> → <b>${m.para}</b><div style="margin-top:5px">${escapeHtml(m.conteudo||"")}</div>
+    <div class="meta">${(m.criado_em||"").replace("T"," ")}</div></div>`;
+}
+function escapeHtml(s){return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+function renderProdutos(prod,c){
+  let h=`<div class="card"><div class="meta-barra"><span>Meta de MRR</span>
+    <span>R$ ${(prod.reduce((a,p)=>a+(p.status==="lancado"?p.mrr_estimado:0),0)).toFixed(0)} / R$ ${c.meta_mrr}</span></div>
+    <div class="prog"><i style="width:${Math.min(100,100*(prod.reduce((a,p)=>a+(p.status==="lancado"?p.mrr_estimado:0),0))/(c.meta_mrr||1))}%"></i></div>
+    <div class="meta">builds hoje: ${c.builds_hoje}</div></div>`;
+  if(!prod.length) h+=`<div class="card">Nenhum produto ainda. O gerente vai criar.</div>`;
+  prod.forEach(p=>{
+    h+=`<div class="card">
+      <b>${escapeHtml(p.nome)}</b> <span class="pill">${p.tipo}</span>
+      <span class="pill">${p.estagio}</span>
+      <div class="meta">${escapeHtml(p.pitch||"")}</div>
+      <div class="prog"><i style="width:${p.progresso}%"></i></div>
+      <div class="kv"><span>progresso ${p.progresso}%</span><span>MRR~R$ ${p.mrr_estimado.toFixed(0)}</span>
+      <span>${p.status}</span></div></div>`;
+  });
+  return h;
+}
+function renderTarefas(tars){
+  if(!tars.length) return `<div class="card">Sem tarefas.</div>`;
+  const cores={pendente:"#fbbf24",em_andamento:"#6ea8fe",concluida:"#4ade80",falhou:"#f87171"};
+  return tars.map(t=>`<div class="card">
+    <span class="pill" style="border-color:${cores[t.status]};color:${cores[t.status]}">${t.status}</span>
+    <b>${escapeHtml(t.setor)}</b> · ${t.estagio}
+    <div style="margin-top:4px">${escapeHtml(t.titulo||"")}</div>
+    ${t.resultado?`<div class="meta">${escapeHtml(t.resultado).slice(0,160)}</div>`:""}</div>`).join("");
+}
+
+function render(){
+  if(!estado) return;
+  const {config:c,setores,funcionarios,produtos,mensagens,eventos,tarefas}=estado;
+  $("#intensidade").value=c.intensidade;
+  $("#meta").value=c.meta_mrr;
+  $("#tick").textContent=(c.tick||"—").replace("T"," ")+(c.pausada?" · PAUSADA":"");
+  $("#btnPausar").textContent=c.pausada?"▶ Retomar":"⏸ Pausar";
+  renderMesas(setores,funcionarios);
+  const cont=$("#conteudo");
+  if(aba==="feed") cont.innerHTML=mensagens.map(cardMsg).join("");
+  else if(aba==="prod") cont.innerHTML=renderProdutos(produtos,c);
+  else cont.innerHTML=renderTarefas(tarefas);
+  // anima eventos novos
+  eventos.slice().reverse().forEach(e=>{
+    if(e.id>visto){ animaMsg(e.de,e.para,e.tipo); }
+  });
+  if(eventos.length) visto=Math.max(visto,...eventos.map(e=>e.id));
+  desenhaLinhas(setores);
+}
+
+async function loop(){
+  try{ estado=await api("/api/estado"); render(); }catch(e){}
+}
+$("#intensidade").onchange=e=>api("/api/intensidade",{valor:e.target.value});
+$("#meta").onchange=e=>api("/api/meta",{meta_mrr:parseFloat(e.target.value)||0});
+$("#btnPausar").onclick=async()=>{const p=!(estado?.config?.pausada);await api("/api/pausar",{pausada:p});loop();};
+$("#btnNovo").onclick=async()=>{const nome=prompt("Nome do produto (deixe vazio p/ a IA escolher):");await api("/api/novo-produto",{nome:nome||"",tipo:"web"});loop();};
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
+  aba=b.dataset.t; document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x===b)); render();
+});
+window.addEventListener("resize",()=>{desenhaLinhas(estado.setores);});
+setInterval(loop,1500); loop();
+</script>
+</body>
+</html>
