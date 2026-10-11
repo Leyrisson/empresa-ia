@@ -70,6 +70,16 @@ class Handler(BaseHTTPRequestHandler):
             setor = parse_qs(urlparse(self.path).query).get("setor", [""])[0]
             from . import conhecimento as kn
             return self._json({"setor": setor, "conteudo": kn.ler(setor)})
+        if rota == "/api/print/escritorio.png":
+            from . import print as print_mod
+            corpo = print_mod.escritorio_png()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(corpo)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(corpo)
+            return
         if rota.startswith("/static/"):
             rel = rota[len("/static/"):].lstrip("/")
             if ".." in rel:

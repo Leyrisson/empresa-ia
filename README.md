@@ -1,10 +1,12 @@
 # Empresa IA — fábrica autônoma de software
 
 Uma "empresa" de agentes de IA que trabalha **em segundo plano** na sua máquina
-para criar sistemas **web e Android** com potencial de lucro. Tem um **gerente**
-e **setores** (pesquisa, produto, dev, QA, growth, financeiro). Você vê cada
-setor **graficamente trabalhando em sua mesa virtual**, trocando mensagens com o
-gerente, que responde e repassa demandas.
+para criar sistemas **web, Android e iOS** com potencial de lucro. Tem um
+**gerente** e **17 setores** (pesquisa, produto, web designer, especialistas,
+auditoria, financeiro, banco de dados, dev web, web developer, front-end,
+back-end, python, android, iOS, QA, growth e gerência). Você vê cada setor
+**trabalhando em sua sala no escritório** e, no celular, pode **pedir o
+escritório pelo Telegram** (resumo + foto).
 
 - Sem dependências externas de Python (só stdlib).
 - Usa o **ollama** local para os agentes e o **opencode** para escrever o código
@@ -18,9 +20,14 @@ Dashboard: **http://127.0.0.1:8770**
 
 ## Destaques
 
-- **Escritório 3D**: salas, mesas, cadeiras, sala de reunião e estantes de
-  arquivo em Three.js; os agentes se movimentam e as mensagens voam entre o
-  gerente e os setores. Câmera orbitável (arrastar) e zoom.
+- **Escritório vivo**: uma **sala por equipe** (20 salas), com mesas, cadeiras,
+  sala de reunião e estantes. A vista **2D** é o padrão (leve, rola em qualquer
+  máquina); há uma **vista 3D** opcional em Three.js. Os agentes se movimentam
+  pelas salas e as **reuniões de setor** acontecem em tempo real (pauta → ata).
+- **Telegram**: do celular você consulta a fábrica — `/fabrica` (resumo),
+  `/print` (foto ao vivo do escritório), `/projetos`, `/reuniao <pauta>`,
+  `/pausar`, `/retomar`, `/relatorio`, `/ideia <texto>`. A foto é renderizada no
+  servidor com Pillow (`/api/print/escritorio.png`), sem abrir navegador.
 - **Painel de ideias** (aba 💡 Ideias): você adiciona o produto que quer e o
   gerente tira da **fila do dono** antes de o LLM inventar algo novo.
 - **Relatório diário** no banco, no Obsidian (`EmpresaIA/`) e no seu Telegram
@@ -38,11 +45,19 @@ Dashboard: **http://127.0.0.1:8770**
     Gerente (Aurélio)
         │  cria produto / despacha estágio / aprova relatório
         ▼
- Pesquisa → Produto → Dev (Web/Android) → QA → Growth → Financeiro
-   ideia     spec        build             teste  preço    receita
-        ▲                                                   │
-        └──────────────── relatórios ───────────────────────┘
+ Pesquisa → Produto → Web Designer → Banco de Dados → Dev → QA →
+  ideia     spec      visual          arquitetura       build  teste
+   Auditoria → Back-End → Front-End → Python → Especialista →
+    revisão     backend    frontend    automação   consultoria
+        ▼
+   Growth → Financeiro      (mercado → monetização)
+    preço    receita
+        ▲                                   │
+        └──────────── relatórios ───────────┘
 ```
+
+O estágio `build` é roteado pelo tipo do produto: **web** → Dev Web,
+**Android** → Desenvolvimento Android, **iOS** → iOS (Apple).
 
 Cada setor tem um funcionário-agente. O gerente cria um produto, despacha o
 estágio atual para o setor responsável; o funcionário produz um **artefato em
@@ -82,8 +97,8 @@ No dashboard dá para **⏸ Pausar / ▶ Retomar**, mudar a **intensidade** e a
 | Variável | Padrão | Para quê |
 |---|---|---|
 | `EMPRESA_BACKEND` | `ollama` | `ollama`, `localai` ou `offline` |
-| `EMPRESA_MODELO_PLANEJADOR` | `qwen2.5:1.5b` | gerente/pesquisa/produto/growth/financeiro |
-| `EMPRESA_MODELO_CODIGO` | `qwen2.5-coder:1.5b` | QA e geração de código por texto |
+| `EMPRESA_MODELO_PLANEJADOR` | `qwen2.5:1.5b` | gerência, pesquisa, produto, design, auditoria, growth, financeiro |
+| `EMPRESA_MODELO_CODIGO` | `qwen2.5-coder:1.5b` | dev web/android/iOS, backend, front-end, banco de dados, python e QA |
 | `EMPRESA_MODO_BUILD` | `opencode` | `opencode` (código real) ou `llm` |
 | `EMPRESA_INTENSIDADE` | `baixa` | intervalo entre ciclos (20/8/3 s) |
 | `EMPRESA_MAX_PRODUTOS_ATIVOS` | `3` | quantos produtos em paralelo |
@@ -103,19 +118,21 @@ No dashboard dá para **⏸ Pausar / ▶ Retomar**, mudar a **intensidade** e a
 empresa-ia/
 ├── empresa/            # código Python (stdlib)
 │   ├── config.py       # configuração
-│   ├── db.py           # SQLite: setores, produtos, tarefas, ideias, office 3D
+│   ├── db.py           # SQLite: setores, produtos, tarefas, ideias, office
 │   ├── conhecimento.py # manuais de especialidade por setor
 │   ├── empacotar.py    # compilar/rodar/instalar/documentar cada produto
 │   ├── obsidian.py     # notas-resumo + relatórios no vault Obsidian
 │   ├── relatorio.py    # relatório diário → Telegram + Obsidian
+│   ├── print.py        # render PNG do escritório (foto p/ Telegram)
 │   ├── llm.py          # ollama/localai + braço opencode
-│   ├── setores.py      # organograma e pipeline
+│   ├── setores.py      # organograma (17 setores) e pipeline (15 estágios)
 │   ├── agentes.py      # gerente + funcionários
+│   ├── reuniao.py      # reuniões de setor (pauta → ata)
 │   ├── orquestrador.py # loop em segundo plano
 │   └── dashboard.py    # servidor HTTP + API
 ├── conhecimento/       # manuais-mestres de cada setor
 ├── static/three.min.js # motor 3D (Three.js local)
-├── templates/escritorio.html   # a tela do escritório (3D + abas)
+├── templates/escritorio.html   # a tela do escritório (2D + 3D + abas)
 ├── produtos/<slug>/            # os apps e documentos gerados
 └── var/                        # banco, logs, arquivo PAUSA
 ```

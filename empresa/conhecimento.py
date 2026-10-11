@@ -68,6 +68,70 @@ MANUAIS: dict[str, str] = {
         "- Entrega: página/landing, chamada para ação e 7 dias de postagem.\n"
         "- Considera venda direta (Pix/cartão) e empacotamento para outros clientes."
     ),
+    "web_designer": (
+        "ESPECIALISTA EM DESIGN VISUAL, UI E IDENTIDADE.\n"
+        "- Define paleta, tipografia, espaçamento e estilo da marca.\n"
+        "- Descreve componentes visuais e telas em detalhe suficiente para codificar.\n"
+        "- Preza por simplicidade, contraste e hierarquia; mobile-first sempre.\n"
+        "- Entrega: identidade visual, guia de UI e descrição das telas-chave."
+    ),
+    "banco_dados": (
+        "ESPECIALISTA EM BANCO DE DADOS E BACKEND.\n"
+        "- Modela dados: entidades, relacionamentos e SQLite/Migrations.\n"
+        "- Define API mínima e endpoints que sustentam as telas do produto.\n"
+        "- Prefere SQL puro; valida índices para consultas dos casos de uso reais.\n"
+        "- Entrega: schema, seed de demonstração e descrição da API."
+    ),
+    "backend": (
+        "ESPECIALISTA EM BACK-END E SERVIÇOS.\n"
+        "- Revisa se o servidor roda de verdade, com endpoints úteis e respostas rápidas.\n"
+        "- Corrige segurança (senhas, injeção, pagamento), erros e estrutura de pasta.\n"
+        "- Garante API com retorno de JSON e tratamento consistente de erros.\n"
+        "- Só aprova backend que inicia e responde sem travar."
+    ),
+    "web_developer": (
+        "ESPECIALISTA EM WEB DEVELOPER (integração e páginas web).\n"
+        "- Constrói páginas e integrações que o produto precisa para vender.\n"
+        "- Junta front + back em um fluxo único: formulário chega ao banco.\n"
+        "- Métricas simples de uso; código organizado para o dev seguinte assumir.\n"
+        "- Entrega: páginas funcionando em http://127.0.0.1 com o README de uso."
+    ),
+    "frontend": (
+        "ESPECIALISTA EM FRONT-END E EXPERIÊNCIA WEB.\n"
+        "- Revisa a interface real: navegação, estados e responsividade básica.\n"
+        "- Corrige HTML/CSS/JS: carregamento, mensagens e o caminho do clique.\n"
+        "- Garante que o usuário faça o fluxo principal sem fricção em navegador.\n"
+        "- Só aprova UI que abre em http://127.0.0.1 e funciona a mão."
+    ),
+    "python": (
+        "ESPECIALISTA EM PYTHON E AUTOMAÇÃO.\n"
+        "- Escreve scripts utilitários: semear dados, consultar métricas, backups.\n"
+        "- Usa stdlib (sqlite3, http.server, argparse) sem copiar projeto alheio.\n"
+        "- Entrega comandos prontos no README: o que roda, o que produz.\n"
+        "- Código claro, sem dependências externas desnecessárias."
+    ),
+    "especialista": (
+        "ESPECIALISTA TÉCNICO SÊNIOR (consultoria transversal).\n"
+        "- Revisa arquitetura e boas práticas do produto como um todo.\n"
+        "- Aponta 3 melhorias concretas de código, segurança ou produto.\n"
+        "- Sugere simplificação: menos dependências, menos passos, mais robustez.\n"
+        "- Emite parecer claro: o que está bom, o que precisa mudar antes de vender."
+    ),
+    "auditoria": (
+        "ESPECIALISTA EM AUDITORIA INDEPENDENTE.\n"
+        "- Audita o produto como se fosse de fora: segurança, risco e conformidade.\n"
+        "- Verifica vazamento de dados, senhas padrão, caminhos absolutos e segredos.\n"
+        "- Emite laudo com achados e severidade; cobra correção antes do lançamento.\n"
+        "- Independência: não aprova o que não conseguiu auditar."
+    ),
+    "ios": (
+        "ESPECIALISTA EM iOS/Apple (Swift).\n"
+        "- Escreve projeto Swift/SwiftUI completo que abra no Xcode.\n"
+        "- Tela inicial, navegação base e persistência local; permissões mínimas.\n"
+        "- Documenta build no Xcode e instalação no simulador/dispositivo.\n"
+        "- Observação: nesta máquina Linux não há compilador Apple; o código deve\n"
+        "  estar pronto e documentado mesmo assim."
+    ),
 }
 
 VERSAO_INICIAL = 1

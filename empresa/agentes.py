@@ -223,7 +223,11 @@ def _contratar_novo_produto() -> None:
             "pitch": "Painel simples para pequenos negócios venderem assinaturas recorrentes.",
             "publico": "pequenos negócios", "valor_estimado": 4900, "mrr_estimado": 990,
         }
-    tipo = "android" if str(dados.get("tipo", "web")).lower().startswith("android") else "web"
+    tipo, tipo_str = "web", str(dados.get("tipo", "web")).lower()
+    if tipo_str.startswith("ios"):
+        tipo = "ios"
+    elif tipo_str.startswith("android"):
+        tipo = "android"
     nome = str(dados.get("nome"))[:60]
     slug = slugificar(nome)
     if db.slug_em_uso(slug):
@@ -291,9 +295,44 @@ _PROMPTS = {
         "em texto/ASCII: cada tela, o que mostra e as ações do usuário. Leve em conta: {pitch}. "
         "Markdown."
     ),
+    "visual": (
+        "Você é {nome}, do setor {setor}. Para «{produto}» ({tipo}), defina a identidade visual: "
+        "paleta de cores (hex), tipografia, estilo de botões e 5 componentes de UI. "
+        "Objetivo: {pitch}. Markdown curto e acionável para o dev implementar."
+    ),
+    "arquitetura": (
+        "Você é {nome}, do setor {setor}. Para «{produto}» ({tipo}), modele os dados do MVP: "
+        "tabelas/entidades, campos e a API mínima (endpoints e o que retornam). Objetivo: {pitch}. "
+        "Escreva o schema em SQL puro (SQLite se possível). Markdown."
+    ),
     "teste": (
         "Você é {nome}, do setor {setor}, QA. Faça um plano de testes para «{produto}» ({tipo}). "
         "Liste 8 casos de teste com resultado esperado e 3 riscos. Markdown."
+    ),
+    "revisao": (
+        "Você é {nome}, do setor {setor}, Auditoria. Audite «{produto}» ({tipo}) como se fosse "
+        "de fora: segurança, vazamento de dados, riscos e conformidade. Aponte 3-5 achados "
+        "com severidade e a correção sugerida. Markdown curto."
+    ),
+    "backend": (
+        "Você é {nome}, do setor {setor}. O MVP de «{produto}» ({tipo}) foi construído. "
+        "Revise/ajuste o back-end: endpoints, tratamento de erros, autenticação/senhas e "
+        "persistência. Liste correções concretas (arquivo/linha). Markdown."
+    ),
+    "frontend": (
+        "Você é {nome}, do setor {setor}. O MVP de «{produto}» ({tipo}) foi construído. "
+        "Revise/ajuste a interface: navegação, responsividade, mensagens e o fluxo principal "
+        "de clique. Liste correções concretas (arquivo/linha). Markdown."
+    ),
+    "automacao": (
+        "Você é {nome}, do setor {setor}, Python. Para «{produto}» ({tipo}), liste 2-3 scripts "
+        "utilitários úteis (semear dados, backup, relatório de uso) com o comando de execução. "
+        "Markdown curto."
+    ),
+    "consultoria": (
+        "Você é {nome}, do setor {setor}, Especialista sênior. Dê parecer técnico sobre "
+        "«{produto}» ({tipo}): 3 melhorias concretas de arquitetura/segurança/robustez e "
+        "1 sugestão de simplificação. Objetivo: {pitch}. Markdown."
     ),
     "monetizacao": (
         "Você é {nome}, do setor {setor}. Defina a estratégia de monetização de «{produto}» ({tipo}): "

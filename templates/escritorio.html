@@ -129,7 +129,7 @@ h2{font-size:15px; margin-bottom:12px}
     <h2>💡 Sugestões de ideias (a empresa cria o que você pedir)</h2>
     <div class="row">
       <input id="nIdeia" placeholder="Nome do produto" style="min-width:220px">
-      <select id="tIdeia"><option value="web">Web</option><option value="android">Android</option></select>
+      <select id="tIdeia"><option value="web">Web</option><option value="android">Android</option><option value="ios">iOS</option></select>
       <input id="pIdeia" placeholder="Pitch / para quem serve" style="flex:1; min-width:220px">
       <button onclick="novaIdeia()">+ Adicionar ideia</button>
     </div>
@@ -153,7 +153,7 @@ h2{font-size:15px; margin-bottom:12px}
 <script>
 const $=(s,q)=>q?q.querySelector(s):document.querySelector(s);
 const estado={oficina:null,avatares:{},desks:{},chairs:{},txCache:{},eventosVistos:new Set(),particulas:[],msg2d:[],agentes2d:{}};
-const NOMES={"gerencia":"Gerência","pesquisa":"Pesquisa & Mercado","produto":"Produto & UX","financeiro":"Financeiro","dev_web":"Dev Web","dev_android":"Dev Android","qa":"Qualidade","marketing":"Monetização"};
+const NOMES={"gerencia":"Gerência","pesquisa":"Pesquisa & Mercado","produto":"Produto & UX","financeiro":"Financeiro","dev_web":"Dev Web","dev_android":"Dev Android","qa":"Qualidade","marketing":"Monetização","web_designer":"Web Designer","especialista":"Especialistas","auditoria":"Auditoria","banco_dados":"Banco de Dados","web_developer":"Web Developer","frontend":"Front-End","backend":"Back-End","python":"Python","ios":"iOS","recepcao":"Recepção","copa":"Copa"};
 const COR_STAT={"trabalhando":"#3ddc84","pensando":"#ff9f43","ocioso":"#6b7a99","reuniao":"#f5c542"};
 
 async function api(rota,opts){const r=await fetch(rota,opts);return r.json();}
@@ -168,6 +168,10 @@ const lugaresReu=[]; // assentos calculados ao carregar office
 
 function tela2d(x,z){return [OX + z*S, OY - x*S];}
 
+function centroReuniao(){
+  const mesa=(estado.oficina||[]).find(o=>o.tipo==='mesa'&&(o.nome||'').includes('Reunião'));
+  return mesa?{x:mesa.x,z:mesa.z}:{x:1.8,z:5.5};
+}
 function calcEscala(){
   const cv=$('#canvas2d'); c2d=cv; ctx2d=cv.getContext('2d');
   const W=cv.clientWidth, H=cv.clientHeight;
@@ -176,9 +180,11 @@ function calcEscala(){
   cv.width=W; cv.height=H;
   const sala=lugaresReu||[];
   if(sala.length) return;
-  // assentos da sala de reunião (em volta da mesa em (1.6,5.9))
+  const r=centroReuniao();
+  // assentos em volta da mesa de reunião (2 fileiras laterais)
   for(let i=0;i<8;i++){
-    lugaresReu.push({x:2.05, z:5.9-1.05+ (i*2.1)/(Math.max(1,7)) });
+    const lado=i%2?'+':'-', n=Math.floor(i/2)+1;
+    lugaresReu.push({x:r.x+(lado==='+'?0.75:-0.75), z:r.z+(n*0.95)});
   }
 }
 function desenharEscritorio(){
@@ -192,35 +198,33 @@ function desenharEscritorio(){
   const [x0,y0]=tela2d(0,-7.2),[x1,y1]=tela2d(10.4,7.2);
   g.strokeStyle='#3d4660'; g.lineWidth=2; g.strokeRect(x0-8,y1-8,x1-x0+16,y0-y1+16);
 
-  // salas destacadas (carpete) e rótulos
-  const sala=(x1,z1,x2,z2,c)=>coresSala([x1,z1],[x2,z2],c);
-  sala(0.3,-7.0,3.3,-3.0,'rgba(97,74,48,.20)');    // arquivos (esquerda)
-  sala(0.3,4.3,3.3,7.5,'rgba(74,60,110,.20)');     // reunião (direita)
-  rotular(2.3,-5.2,'📁 Arquivos');
-  rotular(1.6,6.6,'🗣 Sala de Reunião');
+  // salas do banco: carpete + parede + rótulo
+  for(const o of (estado.oficina||[])){
+    if(o.tipo!=='sala'||!o.lx||!o.lz)continue;
+    const [x2,y2]=tela2d(o.x+o.lx/2,o.z+o.lz/2), [x3,y3]=tela2d(o.x-o.lx/2,o.z-o.lz/2);
+    const px=Math.min(x2,x3), py=Math.min(y2,y3), pw=Math.abs(x2-x3), ph=Math.abs(y2-y3);
+    g.fillStyle=o.cor||'#2c3246'; g.globalAlpha=.45; g.fillRect(px,py,pw,ph); g.globalAlpha=1;
+    g.strokeStyle='rgba(210,205,230,.25)'; g.lineWidth=1.5; g.strokeRect(px,py,pw,ph);
+    g.font='bold 10px sans-serif'; g.textAlign='center'; g.fillStyle='#cdd5e8';
+    const nome=(o.nome||'Sala').replace('Sala ','');
+    g.fillText(nome,(px+pw/2),py+12);
+  }
 
-  // mobília (mesas, cadeiras, armários, mesa da reunião)
+  // mobília (mesas, cadeiras, armários, mesa grande da reunião)
   for(const o of (estado.oficina||[])){
     const cor=o.cor||'#8f9bb3';
     if(o.tipo==='mesa'){
-      mesa(o.x,o.z,o.setor==='gerencia'?3.4:1.55,cor,o.setor);
+      mesa(o.x,o.z,o.setor==='gerencia'?3.4:1.55,cor,o.setor,(o.nome||'').includes('Reunião'));
     }else if(o.tipo==='cadeira'){
       cadeira(o.x,o.z,cor,o.setor);
-    }else if(o.tipo==='sala'){
-      mesa(o.x,o.z,4.4,cor,null,true);
-      rotular(o.x,o.z+1.15,o.nome||'mesa de reunião');
     }else if(o.tipo==='arquivo'){
       armario(o.x,o.z,cor);
-    }else if(o.tipo==='parede'){
-      const [px,py]=tela2d(o.x,o.z);
-      g.fillStyle='rgba(210,205,230,.16)';
-      g.fillRect(px-5,py-5,10,10);
     }
   }
   // reunião ativa: marca na sala
   const ativa=estado.reuniaoAtiva;
   if(ativa){
-    const [tx,ty]=tela2d(1.7,5.9);
+    const c=centroReuniao(), [tx,ty]=tela2d(c.x,c.z);
     g.beginPath(); g.arc(tx,ty,26,0,7); g.fillStyle='rgba(245,197,66,.10)'; g.fill(); g.strokeStyle='#f5c542'; g.stroke();
     g.font='bold 12px sans-serif'; g.fillStyle='#ffe9a8'; g.textAlign='center';
     g.fillText('REUNIÃO 🔥',tx,ty-32);
@@ -419,17 +423,16 @@ function desenharObjetos3(){
   for(const o of (estado.oficina||[])){
     const cor=o.cor||'#8f9bb3',x=o.x,z=o.z;
     if(o.tipo==='mesa'){
-      caixa(x,.05,z,1.25,.09,.62,cor);
-      for(const[px,pz]of [[-.52,-.25],[.52,-.25],[-.52,.25],[.52,.25]])caixa(x+px,.17,z+pz,.07,.34,.07,'#20242f');
+      if((o.nome||'').includes('Reunião')){
+        caixa(x,.1,z,2.9,.1,1.25,cor); for(let i=-1;i<=1;i++)caixa(x+i*.55,.02,z+1.2,.5,.1,.5,'#3b4258');
+      }else{
+        caixa(x,.05,z,1.25,.09,.62,cor);
+        for(const[px,pz]of [[-.52,-.25],[.52,-.25],[-.52,.25],[.52,.25]])caixa(x+px,.17,z+pz,.07,.34,.07,'#20242f');
+      }
       if(!estado.desks[o.setor])estado.desks[o.setor]={x:x+1.45,y:1.15,z};
     }else if(o.tipo==='cadeira'){
       caixa(x,.14,z,.5,.12,.5,cor); caixa(x,.52,z+.27,.5,.6,.07,cor); caixa(x,.4,z-.26,.07,.5,.14,'#606876');
       estado.chairs[o.setor]={x,z};
-    }else if(o.tipo==='sala'){
-      caixa(x,.06,z,2.9,.1,1.25,cor); for(let i=-1;i<=1;i++)caixa(x+i*.55,.02,z+1.2,.5,.1,.5,'#3b4258');
-    }else if(o.tipo==='parede'){
-      const comum=!(o.nome||'').includes('Sala Reunião');
-      caixa(x,.75,z,comum?2.6:.08,1.5,comum?.08:2.6,cor);
     }else if(o.tipo==='arquivo'){
       caixa(x,.75,z,.7,1.5,.38,cor); caixa(x,.15,z,.62,.22,.3,'#6f4c1f'); caixa(x,.55,z,.62,.22,.3,'#6f4c1f'); caixa(x,.78,z,.62,.22,.3,'#6f4c1f');
     }
