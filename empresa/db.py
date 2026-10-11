@@ -93,6 +93,57 @@ CREATE TABLE IF NOT EXISTS eventos (
 CREATE INDEX IF NOT EXISTS idx_msg_criado ON mensagens(criado_em);
 CREATE INDEX IF NOT EXISTS idx_ev_criado  ON eventos(criado_em);
 CREATE INDEX IF NOT EXISTS idx_tar_status ON tarefas(status, setor);
+CREATE TABLE IF NOT EXISTS ideias (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo       TEXT NOT NULL,
+    tipo         TEXT DEFAULT 'web',
+    pitch        TEXT,
+    origem       TEXT DEFAULT 'dono',
+    status       TEXT DEFAULT 'fila',
+    criado_em    TEXT,
+    escolhido_em TEXT,
+    produto_id   INTEGER REFERENCES produtos(id)
+);
+CREATE TABLE IF NOT EXISTS relatorios (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    data       TEXT UNIQUE,
+    titulo     TEXT,
+    conteudo   TEXT,
+    canais     TEXT DEFAULT '',
+    enviado_em TEXT
+);
+CREATE TABLE IF NOT EXISTS conhecimento (
+    setor        TEXT PRIMARY KEY,
+    conteudo     TEXT,
+    versao       INTEGER DEFAULT 1,
+    atualizado_em TEXT
+);
+CREATE TABLE IF NOT EXISTS office (
+    id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome   TEXT,
+    tipo   TEXT,
+    x      REAL DEFAULT 0,
+    y      REAL DEFAULT 0,
+    z      REAL DEFAULT 0,
+    rot    REAL DEFAULT 0,
+    cor    TEXT,
+    setor  TEXT,
+    estado TEXT DEFAULT 'livre'
+);
+CREATE TABLE IF NOT EXISTS verificacoes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    produto_id INTEGER,
+    etapa      TEXT,
+    ok         INTEGER,
+    detalhe    TEXT,
+    criado_em  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ideias_status   ON ideias(status);
+CREATE INDEX IF NOT EXISTS idx_rel_data        ON relatorios(data);
+CREATE INDEX IF NOT EXISTS idx_office_setor    ON office(setor);
+CREATE INDEX IF NOT EXISTS idx_ver_produto     ON verificacoes(produto_id);
+CREATE INDEX IF NOT EXISTS idx_prod_slug       ON produtos(slug);
+CREATE INDEX IF NOT EXISTS idx_prod_estagio    ON produtos(estagio, status);
 """
 
 
@@ -113,9 +164,61 @@ def conectar():
         con.close()
 
 
+def _cols(con, tabela: str) -> set[str]:
+    return {r[1] for r in con.execute(f"PRAGMA table_info({tabela})")}
+
+
+def _add_col(con, tabela: str, coluna: str, ddl: str) -> None:
+    if coluna not in _cols(con, tabela):
+        con.execute(f"ALTER TABLE {tabela} ADD COLUMN {ddl}")
+
+
+def _sembrar_office(con) -> None:
+    """Planta baixa 3D do escritorio (salas, mesas, cadeiras, arquivos...)."""
+    n = con.execute("SELECT COUNT(*) c FROM office").fetchone()["c"]
+    if n:
+        return
+    objs = [
+        # Gerente (mesa maior, centro quase ao fundo)
+        ("Mesa do Gerente", "mesa", 7.6, 0, 0.0, 0.0, "c8a94b", "gerencia"),
+        ("Cadeira do Gerente", "cadeira", 8.6, 0, 0.0, 0.0, "a0802f", "gerencia"),
+        ("Mesa Grande (reunião)", "sala", 1.6, 0, 5.9, 0.0, "8e6f3f", None),
+        ("Parede Sala Reunião", "parede", 1.6, 1.2, 7.3, 0.0, "d9c9a8", None),
+        ("Parede Sala Reunião", "parede", 1.6, 1.2, 5.1, 0.0, "d9c9a8", None),
+        # Setores — fileira A na frente
+        ("Mesa Pesquisa", "mesa", 3.7, 0, -4.8, 0.0, "#5b9bd5", "pesquisa"),
+        ("Mesa Produto", "mesa", 3.7, 0, -1.7, 0.0, "#70ad47", "produto"),
+        ("Mesa Financeiro", "mesa", 3.7, 0, 1.7, 0.0, "#ffc000", "financeiro"),
+        ("Mesa Marketing", "mesa", 3.7, 0, 4.8, 0.0, "#ed7d31", "marketing"),
+        # fileira B (dev + qa)
+        ("Mesa Dev Web", "mesa", 5.5, 0, -4.8, 0.0, "#4472c4", "dev_web"),
+        ("Mesa Dev Android", "mesa", 5.5, 0, -1.7, 0.0, "#43b653", "dev_android"),
+        ("Mesa QA", "mesa", 5.5, 0, 1.7, 0.0, "#7030a0", "qa"),
+    ]
+    # cadeiras ao lado de cada mesa de setor
+    for (m, x, z) in [
+        ("pesquisa", 3.7, -4.8), ("produto", 3.7, -1.7),
+        ("financeiro", 3.7, 1.7), ("marketing", 3.7, 4.8),
+        ("dev_web", 5.5, -4.8), ("dev_android", 5.5, -1.7), ("qa", 5.5, 1.7),
+    ]:
+        objs.append(("Cadeira " + m, "cadeira", x, 0, z + 1.05, 0.0, "#c7c7c7", m))
+    # arquivo (estante de projetos) — canto esquerdo
+    for i, zz in enumerate([-6.9, -5.8, -4.7, -3.6]):
+        objs.append((f"Arquivo {i+1}", "arquivo", 2.2, 0, zz, 0.0, "#8a5a2b", None))
+    for nome, tipo, x, y, z, rot, cor, setor in objs:
+        con.execute(
+            "INSERT INTO office(nome,tipo,x,y,z,rot,cor,setor,estado) VALUES(?,?,?,?,?,?,?,?, 'livre')",
+            (nome, tipo, x, y, z, rot, cor, setor),
+        )
+
+
 def init() -> None:
     with conectar() as con:
         con.executescript(SCHEMA)
+        _add_col(con, "produtos", "repo", "repo TEXT")
+        _add_col(con, "setores", "sala", "sala TEXT")
+        _add_col(con, "ideias", "pitch_extra", "pitch_extra TEXT")
+        _sembrar_office(con)
 
 
 # ---------------- config (chave/valor) ----------------
@@ -293,6 +396,116 @@ def builds_hoje() -> int:
         return r["c"] if r else 0
 
 
+# ---------------- ideias (sugestões do dono) ----------------
+def criar_ideia(titulo: str, tipo: str = "web", pitch: str = "", origem: str = "dono") -> int:
+    with conectar() as con:
+        cur = con.execute(
+            "INSERT INTO ideias(titulo,tipo,pitch,origem,status,criado_em)"
+            " VALUES(?,?,?,?, 'fila', ?)",
+            (titulo, tipo, pitch, origem, agora()),
+        )
+        return cur.lastrowid
+
+
+def listar_ideias(status: str | None = None) -> list[dict]:
+    with conectar() as con:
+        if status:
+            q = "SELECT * FROM ideias WHERE status=? ORDER BY id"
+            return [dict(r) for r in con.execute(q, (status,))]
+        return [dict(r) for r in con.execute("SELECT * FROM ideias ORDER BY id")]
+
+
+def pegar_proxima_ideia() -> dict | None:
+    """Pega (atomicamente) a próxima ideia do dono na fila e marca como escolhida."""
+    with conectar() as con:
+        r = con.execute(
+            "SELECT * FROM ideias WHERE status='fila' ORDER BY id LIMIT 1"
+        ).fetchone()
+        if not r:
+            return None
+        con.execute(
+            "UPDATE ideias SET status='escolhida', escolhido_em=? WHERE id=?",
+            (agora(), r["id"]),
+        )
+        return dict(r)
+
+
+def concluir_ideia(iid: int, produto_id: int | None = None) -> None:
+    with conectar() as con:
+        con.execute(
+            "UPDATE ideias SET status='concluida', produto_id=?, escolhido_em=COALESCE(escolhido_em, ?)"
+            " WHERE id=?",
+            (produto_id, agora(), iid),
+        )
+
+
+def descartar_ideia(iid: int) -> None:
+    with conectar() as con:
+        con.execute("UPDATE ideias SET status='descartada' WHERE id=?", (iid,))
+
+
+# ---------------- relatórios diários ----------------
+def registrar_relatorio(data: str, titulo: str, conteudo: str, canais: str) -> None:
+    with conectar() as con:
+        con.execute(
+            "INSERT INTO relatorios(data,titulo,conteudo,canais,enviado_em) VALUES(?,?,?,?,?) "
+            "ON CONFLICT(data) DO UPDATE SET titulo=excluded.titulo, conteudo=excluded.conteudo,"
+            " canais=excluded.canais, enviado_em=excluded.enviado_em",
+            (data, titulo, conteudo, canais, agora()),
+        )
+
+
+def relatorio_do_dia(data: str) -> dict | None:
+    with conectar() as con:
+        r = con.execute("SELECT * FROM relatorios WHERE data=?", (data,)).fetchone()
+        return dict(r) if r else None
+
+
+def listar_relatorios(limite: int = 8) -> list[dict]:
+    with conectar() as con:
+        return [dict(r) for r in con.execute(
+            "SELECT data,titulo,canais,enviado_em FROM relatorios ORDER BY data DESC LIMIT ?",
+            (limite,))]
+
+
+# ---------------- conhecimento por setor ----------------
+def conhecimento_setor(setor: str) -> dict | None:
+    with conectar() as con:
+        r = con.execute(
+            "SELECT * FROM conhecimento WHERE setor=?", (setor,)).fetchone()
+        return dict(r) if r else None
+
+
+def salvar_conhecimento(setor: str, conteudo: str, versao: int) -> None:
+    with conectar() as con:
+        con.execute(
+            "INSERT INTO conhecimento(setor,conteudo,versao,atualizado_em) VALUES(?,?,?,?) "
+            "ON CONFLICT(setor) DO UPDATE SET conteudo=excluded.conteudo,"
+            " versao=excluded.versao, atualizado_em=excluded.atualizado_em",
+            (setor, conteudo, versao, agora()),
+        )
+
+
+# ---------------- escritório 3D ----------------
+def listar_office() -> list[dict]:
+    with conectar() as con:
+        return [dict(r) for r in con.execute("SELECT * FROM office ORDER BY id")]
+
+
+def verificar(produto_id: int, etapa: str, ok: bool, detalhe: str) -> None:
+    with conectar() as con:
+        con.execute(
+            "INSERT INTO verificacoes(produto_id,etapa,ok,detalhe,criado_em) VALUES(?,?,?,?,?)",
+            (produto_id, etapa, 1 if ok else 0, detalhe, agora()),
+        )
+
+
+def verificacoes_do_produto(pid: int) -> list[dict]:
+    with conectar() as con:
+        return [dict(r) for r in con.execute(
+            "SELECT * FROM verificacoes WHERE produto_id=? ORDER BY id DESC LIMIT 12", (pid,))]
+
+
 # ---------------- mensagens / eventos ----------------
 def mensagem(de: str, para: str, conteudo: str, tipo: str = "info", produto_id: int | None = None) -> int:
     with conectar() as con:
@@ -340,6 +553,12 @@ def snapshot() -> dict:
             "SELECT * FROM eventos ORDER BY id DESC LIMIT 30")]
         tars = [dict(r) for r in con.execute(
             "SELECT * FROM tarefas ORDER BY id DESC LIMIT 60")]
+        ideias = [dict(r) for r in con.execute("SELECT * FROM ideias ORDER BY id")]
+        office = [dict(r) for r in con.execute("SELECT * FROM office ORDER BY id")]
+        conhecimento = [dict(r) for r in con.execute(
+            "SELECT setor, versao, atualizado_em FROM conhecimento")]
+        relatorios = [dict(r) for r in con.execute(
+            "SELECT data,titulo,canais FROM relatorios ORDER BY data DESC LIMIT 8")]
     return {
         "config": {
             "pausada": cfg_get("pausada", False) or config.PAUSA.exists(),
@@ -351,6 +570,7 @@ def snapshot() -> dict:
             "modo_build": config.MODO_BUILD,
             "tick": cfg_get("ultimo_tick"),
             "builds_hoje": builds_hoje(),
+            "hora_relatorio": config.HORA_RELATORIO,
         },
         "setores": setores,
         "funcionarios": funcs,
@@ -358,4 +578,8 @@ def snapshot() -> dict:
         "mensagens": msgs,
         "eventos": evs,
         "tarefas": tars,
+        "ideias": ideias,
+        "office": office,
+        "conhecimento": conhecimento,
+        "relatorios": relatorios,
     }

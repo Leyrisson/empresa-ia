@@ -55,6 +55,19 @@ class Handler(BaseHTTPRequestHandler):
             return self._arquivo(str(config.TEMPLATES / "escritorio.html"))
         if rota == "/api/estado":
             return self._json(db.snapshot())
+        if rota == "/api/ideias":
+            return self._json(db.listar_ideias())
+        if rota == "/api/relatorios":
+            return self._json(db.listar_relatorios())
+        if rota == "/api/conhecimento":
+            with db.conectar() as con:
+                return self._json([dict(r) for r in con.execute(
+                    "SELECT setor, versao, atualizado_em FROM conhecimento ORDER BY setor")])
+        if rota == "/api/conhecimento/texto":
+            from urllib.parse import parse_qs
+            setor = parse_qs(urlparse(self.path).query).get("setor", [""])[0]
+            from . import conhecimento as kn
+            return self._json({"setor": setor, "conteudo": kn.ler(setor)})
         if rota.startswith("/static/"):
             rel = rota[len("/static/"):].lstrip("/")
             if ".." in rel:
@@ -127,6 +140,32 @@ class Handler(BaseHTTPRequestHandler):
                     threading.Thread(target=agentes.ciclo_funcionario,
                                      args=(s["id"],), daemon=True).start()
             return self._json({"ok": True})
+
+        if rota == "/api/ideias":
+            titulo = (corpo.get("titulo") or "").strip()
+            if not titulo:
+                return self._json({"erro": "titulo obrigatório"}, 400)
+            tipo = "android" if str(corpo.get("tipo", "web")).startswith("android") else "web"
+            iid = db.criar_ideia(titulo[:80], tipo, (corpo.get("pitch") or "")[:400], "dono")
+            return self._json({"ok": True, "ideia_id": iid})
+
+        if rota == "/api/ideias/done":
+            iid = int(corpo.get("id") or 0)
+            db.concluir_ideia(iid)
+            return self._json({"ok": True})
+
+        if rota == "/api/ideias/descartar":
+            iid = int(corpo.get("id") or 0)
+            db.descartar_ideia(iid)
+            return self._json({"ok": True})
+
+        if rota == "/api/relatorio":
+            # força o envio agora (botão no dashboard)
+            from . import relatorio
+            r = relatorio.rodar(force=True)
+            if not r:
+                return self._json({"erro": "não foi possível gerar"}, 500)
+            return self._json({"ok": True, "canais": r["canais"]})
 
         self.send_error(404)
 

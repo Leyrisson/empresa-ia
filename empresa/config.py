@@ -13,6 +13,7 @@ VAR = RAIZ / "var"
 PRODUTOS = RAIZ / "produtos"
 TEMPLATES = RAIZ / "templates"
 STATIC = RAIZ / "static"
+CONHECIMENTO = RAIZ / "conhecimento"
 
 VAR.mkdir(parents=True, exist_ok=True)
 PRODUTOS.mkdir(parents=True, exist_ok=True)
@@ -49,6 +50,20 @@ NICE = int(os.environ.get("EMPRESA_NICE", "15"))
 # --- Dashboard ---
 PORTA = int(os.environ.get("EMPRESA_PORTA", "8770"))
 HOST = os.environ.get("EMPRESA_HOST", "127.0.0.1")
+
+# --- Relatório diário + Obsidian + Telegram ---
+# Horario (hora local) em que o relatorio do dia e gerado e enviado ao dono.
+HORA_RELATORIO = int(os.environ.get("EMPRESA_HORA_RELATORIO", "18"))
+# Pasta Obsidian do escritorio: relatorios + resumo de cada projeto.
+OBSIDIAN_EMPRESA = Path(os.environ.get(
+    "EMPRESA_OBSIDIAN", Path.home() / "Obsidian" / "EmpresaIA"))
+# Onde o relatorio busca as credenciais do Telegram (token + chat id).
+TELEGRAM_CREDS = Path(os.environ.get(
+    "EMPRESA_TELEGRAM_CREDS",
+    Path.home() / ".config" / "omarchy-voice" / "plugins" / "telebot" / "credenciais.env",
+))
+# Empacotar e documentar todo produto (instalar.sh, Dockerfile, docs/) apos o build.
+EMPACOTAR = os.environ.get("EMPRESA_EMPACOTAR", "1") == "1"
 
 
 def set_config(chave: str, valor: str) -> None:

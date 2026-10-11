@@ -15,7 +15,7 @@ import os
 import re
 import unicodedata
 
-from . import config, db, llm
+from . import config, db, conhecimento, empacotar, llm
 from .setores import ESTAGIOS, FUNCIONARIOS, ORDEM, setor_do_estagio, proximo_estagio, progresso
 
 GERENTE = "gerencia"
@@ -40,6 +40,7 @@ def slugificar(texto: str) -> str:
 def inicializar(forcar: bool = False) -> None:
     from .setores import SETORES
     db.init()
+    conhecimento.semear()
     travadas = db.recuperar_travadas()
     if travadas:
         log(f"recuperadas {travadas} tarefa(s) travada(s) por queda anterior")
@@ -192,25 +193,25 @@ def _avancar(p: dict, tarefa: dict, parcial: bool = False) -> None:
 
 
 def _contratar_novo_produto() -> None:
-    existentes = ", ".join(f"{p['nome']} ({p['tipo']})" for p in db.listar_produtos()) or "nenhum"
     _status(GERENTE, "pensando", "Escolhendo o próximo produto")
-    sistema = (
-        "Você é o gerente de uma empresa de software cujo objetivo é lançar apps "
-        "web e Android LUCRATIVOS. Responda SEMPRE em JSON puro, em português."
-    )
-    prompt = (
-        "Proponha UM produto de software lucrativo e realista para uma pessoa "
-        "desenvolver sozinha com IA. Fuja do que já existe na empresa.\n"
-        f"Já temos: {existentes}\n\n"
-        "Responda em JSON com as chaves: nome, tipo (\"web\" ou \"android\"), "
-        "pitch (1 frase), publico, valor_estimado (numero em reais, 0 se incerto), "
-        "mrr_estimado (numero em reais), como_lucra."
-    )
-    resp = llm.gerar(prompt, sistema=sistema, json_mode=True, num_predict=260, temperatura=0.9)
-    dados = llm.extrair_json(resp)
+
+    ideia = db.pegar_proxima_ideia()
+    if ideia:
+        # Ideia do dono tem prioridade: vira produto direto, sem IA inventar.
+        dados = {
+            "nome": ideia["titulo"],
+            "tipo": "android" if str(ideia["tipo"]).lower().startswith("android") else "web",
+            "pitch": ideia.get("pitch") or f"Ideia do dono: {ideia['titulo']}",
+            "publico": "a definir",
+            "como_lucra": "a definir",
+            "valor_estimado": 0,
+            "mrr_estimado": 0,
+            "ideia_id": ideia["id"],
+        }
+    else:
+        dados = _ideia_ia()
 
     if not dados or not dados.get("nome"):
-        # fallback deterministico para a empresa nunca travar
         dados = {
             "nome": "Painel de Assinaturas", "tipo": "web",
             "pitch": "Painel simples para pequenos negócios venderem assinaturas recorrentes.",
@@ -229,6 +230,8 @@ def _contratar_novo_produto() -> None:
         "mrr_estimado": float(dados.get("mrr_estimado") or 0),
         "pasta": os.path.join(str(config.PRODUTOS), slug), "status": "ativo",
     })
+    if dados.get("ideia_id"):
+        db.concluir_ideia(dados["ideia_id"], pid)
     db.criar_funcionario({"setor": GERENTE, **FUNCIONARIOS[GERENTE]})  # garante registro
     db.mensagem(GERENTE, "todos",
                 f"Novo produto em pauta: «{nome}» ({tipo}) — {dados.get('pitch','')}",
@@ -239,6 +242,25 @@ def _contratar_novo_produto() -> None:
             f"**Valor estimado:** R$ {dados.get('valor_estimado',0)}\n\n"
             f"**MRR estimado:** R$ {dados.get('mrr_estimado',0)}\n")
     log(f"gerente criou produto: {nome} ({tipo})")
+
+
+def _ideia_ia() -> dict | None:
+    """O gerente pede uma ideia ao LLM (usado quando a fila do dono está vazia)."""
+    existentes = ", ".join(f"{p['nome']} ({p['tipo']})" for p in db.listar_produtos()) or "nenhum"
+    sistema = (
+        "Você é o gerente de uma empresa de software cujo objetivo é lançar apps "
+        "web e Android LUCRATIVOS. Responda SEMPRE em JSON puro, em português."
+    )
+    prompt = (
+        "Proponha UM produto de software lucrativo e realista para uma pessoa "
+        "desenvolver sozinha com IA. Fuja do que já existe na empresa.\n"
+        f"Já temos: {existentes}\n\n"
+        "Responda em JSON com as chaves: nome, tipo (\"web\" ou \"android\"), "
+        "pitch (1 frase), publico, valor_estimado (numero em reais, 0 se incerto), "
+        "mrr_estimado (numero em reais), como_lucra."
+    )
+    resp = llm.gerar(prompt, sistema=sistema, json_mode=True, num_predict=260, temperatura=0.9)
+    return llm.extrair_json(resp)
 
 
 # ---------------------------------------------------------------- FUNCIONÁRIOS
@@ -319,7 +341,9 @@ def _gerar_documento(setor: str, p: dict, tarefa: dict) -> str:
     nome = FUNCIONARIOS[setor]["nome"]
     tmpl = _PROMPTS.get(tarefa["estagio"], "Você é {nome} do setor {setor}. Trabalhe a demanda para «{produto}».")
     prompt = tmpl.format(nome=nome, setor=setor, produto=p["nome"], tipo=p["tipo"], pitch=p["pitch"])
-    resp = llm.gerar(prompt, modelo=FUNCIONARIOS[setor]["modelo"], num_predict=320, temperatura=0.6)
+    resp = llm.gerar(prompt, modelo=FUNCIONARIOS[setor]["modelo"],
+                     sistema=conhecimento.sistema_agente(setor),
+                     num_predict=320, temperatura=0.6)
     if resp.startswith("__ERRO_LLM__") or not resp.strip():
         resp = f"# {tarefa['titulo']}\n\n(não foi possível consultar o LLM: {resp[:200]})"
     idx = ORDEM.index(tarefa["estagio"])
@@ -357,7 +381,14 @@ def _construir(p: dict, tarefa: dict) -> str:
                 f"\n\n## Saída do engenheiro\n\n```\n{saida[-2500:]}\n```\n")
         if not ok and len(criados) <= 1:
             raise RuntimeError("opencode não produziu arquivos")
-        return f"App {'gerado' if ok else 'parcialmente gerado'} com {len(criados)} arquivo(s)."
+        pacote = ""
+        if config.EMPACOTAR:
+            try:
+                pacote = " | " + empacotar.empacotar_e_documentar(p)
+            except Exception as e:  # noqa: BLE001
+                pacote = f" | empacotamento falhou: {e}"
+                db.verificar(p["id"], "empacotar", False, str(e))
+        return f"App {'gerado' if ok else 'parcialmente gerado'} com {len(criados)} arquivo(s).{pacote}"
 
     # MODO_BUILD == "llm": pede os arquivos em JSON e escreve em disco
     sistema = ("Você é um engenheiro. Responda SOMENTE JSON com a chave 'arquivos': "
@@ -382,6 +413,13 @@ def _construir(p: dict, tarefa: dict) -> str:
         n += 1
     if n == 0:
         _salvar(p, "README.md", f"# {p['nome']}\n\nMVP ainda não gerado (LLM indisponível).\n")
+    if config.EMPACOTAR:
+        try:
+            pacote = " | " + empacotar.empacotar_e_documentar(p)
+            return f"App gerado com {n} arquivo(s) (modo llm).{pacote}"
+        except Exception as e:  # noqa: BLE001
+            db.verificar(p["id"], "empacotar", False, str(e))
+            return f"App gerado com {n} arquivo(s) (modo llm; empacotamento falhou: {e})"
     return f"App gerado com {n} arquivo(s) (modo llm)."
 
 

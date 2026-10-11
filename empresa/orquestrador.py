@@ -13,10 +13,33 @@ import sys
 import time
 import traceback
 
-from . import agentes, config, db
+from . import agentes, config, db, obsidian, relatorio
 from .setores import SETORES
 
 _PARAR = False
+
+
+def _resumos_no_obsidian() -> None:
+    """Notas-resumo de cada produto no vault (barato, idempotente)."""
+    try:
+        obsidian.escrever_indice()
+        for p in db.listar_produtos():
+            obsidian.escrever_resumo_produto(p)
+    except Exception:  # noqa: BLE001
+        agentes.log("ERRO escrevendo Obsidian: " + traceback.format_exc(limit=2))
+
+
+def _verificar_relatorio_diario() -> None:
+    """Dispara o relatório do dia quando a hora configurada chegar (1x/dia)."""
+    hoje = time.strftime("%Y-%m-%d")
+    if int(time.strftime("%H")) >= config.HORA_RELATORIO:
+        if not db.relatorio_do_dia(hoje):
+            try:
+                r = relatorio.rodar()
+                if r:
+                    agentes.log(f"relatorio diario entregue ({r['canais']})")
+            except Exception:  # noqa: BLE001
+                agentes.log("ERRO relatorio: " + traceback.format_exc(limit=2))
 
 
 def _sinais(_sig, _frame):
@@ -33,6 +56,7 @@ def um_ciclo() -> None:
     agentes.inicializar()
     db.cfg_set("ultimo_tick", db.agora())
     agentes.ciclo_gerente()
+    _resumos_no_obsidian()
     for s in SETORES:
         if _PARAR:
             return
@@ -65,6 +89,7 @@ def executar(intervalo: float | None = None) -> None:
                 time.sleep(3)
                 continue
             um_ciclo()
+            _verificar_relatorio_diario()
         except Exception:  # noqa: BLE001
             agentes.log("ERRO ciclo principal: " + traceback.format_exc(limit=3))
         for _ in range(int((intervalo or config.SLEEP) * 10)):

@@ -16,6 +16,22 @@ gerente, que responde e repassa demandas.
 
 Dashboard: **http://127.0.0.1:8770**
 
+## Destaques
+
+- **Escritório 3D**: salas, mesas, cadeiras, sala de reunião e estantes de
+  arquivo em Three.js; os agentes se movimentam e as mensagens voam entre o
+  gerente e os setores. Câmera orbitável (arrastar) e zoom.
+- **Painel de ideias** (aba 💡 Ideias): você adiciona o produto que quer e o
+  gerente tira da **fila do dono** antes de o LLM inventar algo novo.
+- **Relatório diário** no banco, no Obsidian (`EmpresaIA/`) e no seu Telegram
+  (automático às 18h ou pelo botão "Relatório agora").
+- **Contrato "de verdade" por produto**: cada build compila (`py_compile`),
+  é checado por boot HTTP, recebe `iniciar.sh`/`instalar.sh` (systemd),
+  `Dockerfile`+`docker-compose.yml` (p/ vender para cliente) e documentação
+  completa (`docs/INSTALACAO`, `USO`, `VENDEDOR`) — tudo registrado no banco.
+- **Agentes especialistas**: cada setor tem um manual de conhecimento
+  (`conhecimento/<setor>.md`) que entra no prompt de sistema do agente.
+
 ## Como funciona (o fluxo)
 
 ```
@@ -73,6 +89,8 @@ No dashboard dá para **⏸ Pausar / ▶ Retomar**, mudar a **intensidade** e a
 | `EMPRESA_MAX_PRODUTOS_ATIVOS` | `3` | quantos produtos em paralelo |
 | `EMPRESA_MAX_BUILDS_DIA` | `6` | teto de builds com opencode por dia |
 | `EMPRESA_META_MRR` | `10000` | meta de receita recorrente (R$) |
+| `EMPRESA_HORA_RELATORIO` | `18` | hora do relatório diário (local) |
+| `EMPRESA_OBSIDIAN` | `~/Obsidian/EmpresaIA` | onde escrever relatórios/resumos |
 | `EMPRESA_PORTA` | `8770` | porta do dashboard |
 
 > **Importante sobre desempenho:** nesta máquina (GTX 950, 2 GB de VRAM), modelos
@@ -85,13 +103,19 @@ No dashboard dá para **⏸ Pausar / ▶ Retomar**, mudar a **intensidade** e a
 empresa-ia/
 ├── empresa/            # código Python (stdlib)
 │   ├── config.py       # configuração
-│   ├── db.py           # SQLite: setores, produtos, tarefas, mensagens
+│   ├── db.py           # SQLite: setores, produtos, tarefas, ideias, office 3D
+│   ├── conhecimento.py # manuais de especialidade por setor
+│   ├── empacotar.py    # compilar/rodar/instalar/documentar cada produto
+│   ├── obsidian.py     # notas-resumo + relatórios no vault Obsidian
+│   ├── relatorio.py    # relatório diário → Telegram + Obsidian
 │   ├── llm.py          # ollama/localai + braço opencode
 │   ├── setores.py      # organograma e pipeline
 │   ├── agentes.py      # gerente + funcionários
 │   ├── orquestrador.py # loop em segundo plano
 │   └── dashboard.py    # servidor HTTP + API
-├── templates/escritorio.html   # a tela do escritório
+├── conhecimento/       # manuais-mestres de cada setor
+├── static/three.min.js # motor 3D (Three.js local)
+├── templates/escritorio.html   # a tela do escritório (3D + abas)
 ├── produtos/<slug>/            # os apps e documentos gerados
 └── var/                        # banco, logs, arquivo PAUSA
 ```
