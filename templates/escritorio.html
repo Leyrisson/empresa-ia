@@ -67,6 +67,9 @@ select option{background:#171a26}
 .est{width:60%; background:#171a26; border-radius:6px; height:8px; overflow:hidden}
 .est i{display:block; height:100%; background:var(--dourado); border-radius:6px}
 .pequeno{font-size:11px; color:var(--dim)}
+#agentetooltip{position:absolute; z-index:20; pointer-events:none; background:rgba(18,21,33,.96); border:1px solid var(--borda); border-radius:10px; padding:9px 11px; font-size:12px; line-height:1.45; min-width:180px; max-width:280px; display:none; box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#agentetooltip .tt-st{font-size:10px; text-transform:uppercase; letter-spacing:.5px; font-weight:700}
+#agentetooltip .tt-tarefa{color:var(--texto); margin-top:2px}
 .tag{font-size:10px; border-radius:6px; padding:2px 6px; border:1px solid var(--borda); color:var(--dim)}
 h2{font-size:15px; margin-bottom:12px}
 </style>
@@ -100,6 +103,7 @@ h2{font-size:15px; margin-bottom:12px}
 
 <div id="cena">
   <div id="reuniaoBarra"></div>
+  <div id="agentetooltip"></div>
   <canvas id="canvas2d"></canvas>
   <canvas id="canvas3d"></canvas>
   <div id="aviso3d">WebGL indisponível neste navegador.</div>
@@ -314,6 +318,11 @@ function desenhar2d(){
     g.fill(); g.shadowBlur=0;
     g.beginPath(); g.arc(px,py,13,0,7); g.fillStyle=cor; g.fill();
     g.font='16px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(a.emoji,px,py+1);
+    // destaque do agente sob o mouse
+    if(hover===s){
+      g.beginPath(); g.arc(px,py,21,0,7);
+      g.strokeStyle=cor; g.lineWidth=2; g.setLineDash([5,4]); g.stroke(); g.setLineDash([]);
+    }
     // bolha de tarefa
     if(a.tarefa||st==='reuniao'){
       const txt=st==='reuniao'?('🤝 '+a.tarefa||'Reunião'):('⚙️ '+a.tarefa);
@@ -325,6 +334,62 @@ function desenhar2d(){
     }
   }
 }
+
+/* =====================================================================
+   HOVER — balão de resumo do agente (2D)
+   ===================================================================== */
+let hover=null;
+function agenteNoPonto(x,y){
+  let melhor=null, dMin=24;
+  for(const s in estado.agentes2d){
+    const a=estado.agentes2d[s];
+    const [px,py]=tela2d(a.x,a.z);
+    const d=Math.hypot(px-x,py-y);
+    if(d<dMin){dMin=d;melhor=s;}
+  }
+  return melhor;
+}
+function ultimaMsg(s){
+  const lista=(estado.mensagens||[]);
+  for(let i=lista.length-1;i>=0;i--){
+    const m=lista[i];
+    if(m.de===s||m.para===s)return (m.de||'')+' '+((m.criado_em||'').slice(11,16))+' — '+(m.conteudo||'').slice(0,80);
+  }
+  return null;
+}
+function montarTooltip(s){
+  const a=estado.agentes2d[s]||{}, f=estado.funcionarios[s]||{};
+  const st=(f.status||a.status||'ocioso');
+  const hl={trabalhando:'Trabalhando',pensando:'Pensando',ocioso:'Ocioso',reuniao:'Em reunião'};
+  const cor=(COR_STAT[st]||COR_STAT.ocioso);
+  let tarefa=(f.tarefa_atual||a.tarefa||'').slice(0,90);
+  if(!tarefa){
+    if(st==='reuniao')tarefa='Participando da reunião em andamento';
+    else if(st==='pensando')tarefa='Raciocinando sobre a próxima demanda…';
+    else tarefa='Aguardando nova demanda.';
+  }
+  const humor=f.humor?` · humor: ${f.humor}`:'';
+  const ult=ultimaMsg(s);
+  return `<div><b>${a.emoji||'🤖'} ${esc(a.nome||s)}</b> <span class="tt-st" style="color:${cor}">${hl[st]||st}</span></div>`
+    +`<div class="tt-tarefa">⚙️ ${esc(tarefa)}</div>`
+    +(ult?`<div class="pequeno" style="margin-top:4px">💬 ${esc(ult)}</div>`:'')
+    +`<div class="pequeno">${esc(f.funcao||a.nome||'')}${humor}</div>`;
+}
+function moverTooltip(x,y){
+  const cv=$('#canvas2d'), tt=$('#agentetooltip');
+  const r=cv.getBoundingClientRect();
+  const h=agenteNoPonto(x-r.left,y-r.top);
+  if(!h||vista!=='2d'){hover=null;tt.style.display='none';return;}
+  hover=h; tt.innerHTML=montarTooltip(h);
+  let fx=x-r.left-150, fy=y-r.top-95;
+  if(fx<8)fx=x-r.left+24;
+  if(fy<8)fy=y-r.top+24;
+  if(fx+190>r.width)fx=r.width-198;
+  if(fy+150>r.height)fy=r.height-158;
+  tt.style.left=fx+'px'; tt.style.top=fy+'px'; tt.style.display='block';
+}
+$('#canvas2d').addEventListener('mousemove',e=>moverTooltip(e.clientX,e.clientY));
+$('#canvas2d').addEventListener('mouseleave',()=>{hover=null;$('#agentetooltip').style.display='none';});
 
 /* =====================================================================
    VISTA 3D (Three.js) — mantida como alternativa
