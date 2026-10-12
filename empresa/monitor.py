@@ -129,10 +129,21 @@ def _subir(p: dict) -> str | None:
 
 
 def abrir(p: dict) -> str | None:
-    """Sobe o app do produto (se preciso) e devolve a URL, guardando-a no banco."""
+    """Sobe o app do produto e devolve a URL, guardando-a no banco.
+
+    Prefere o **serviço systemd** (sobe sozinho e reinicia se cair); se não der
+    (sem systemd de usuário), cai no processo solto de sempre.
+    """
     if not p:
         return None
-    url = _subir(p)
+    url = None
+    try:
+        from . import servico
+        url = servico.instalar(p)
+    except Exception:  # noqa: BLE001
+        url = None
+    if not url:
+        url = _subir(p)
     if url and p.get("url") != url:
         try:
             db.atualizar_produto(p["id"], url=url)

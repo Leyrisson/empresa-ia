@@ -7,6 +7,8 @@ Uso:
   python -m empresa um-ciclo      # executa uma rodada e sai (teste)
   python -m empresa status        # imprime o estado em texto
   python -m empresa doutor        # checa backend/ollama/opencode
+  python -m empresa servico       # cria/sobe serviço systemd dos produtos web
+  python -m empresa servico <slug>  # só de um produto
 """
 from __future__ import annotations
 
@@ -69,6 +71,9 @@ def main(argv: list[str] | None = None) -> int:
         return _doutor()
     elif cmd in ("monitorar", "monitor"):
         return _monitorar()
+    elif cmd in ("servico", "servicos", "serviço", "service"):
+        from . import servico
+        return servico.executar(args[1] if len(args) > 1 else None)
     elif cmd == "tudo":
         agentes.inicializar()
         t = threading.Thread(target=orquestrador.executar, daemon=True)

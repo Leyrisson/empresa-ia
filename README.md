@@ -53,6 +53,13 @@ Dashboard: **http://127.0.0.1:8770**
   quando o build termina com código, **sobe o app** e manda o link. O link fica
   salvo no produto e aparece no painel como **▶ Abrir** (aba Produtos); se o app
   ainda não estiver rodando, o botão **▶ Rodar** sobe e abre.
+- **Cada produto vira um serviço systemd** (`empresa/servico.py`): quando o build
+  fica pronto, a fábrica cria `empresa-produto-<slug>.service` (systemd de
+  usuário) que roda `python3 app.py` na porta do produto, **reinicia sozinho** se
+  cair (`Restart=on-failure`) e **sobe no boot** (`linger`). Assim o **▶ Abrir**
+  aponta para algo que não morre. CLI: `python -m empresa servico`
+  (`--todos`, `--listar` ou um `slug`); logs em
+  `journalctl --user -u empresa-produto-<slug>`.
 - **Agentes especialistas**: cada setor tem um manual de conhecimento
   (`conhecimento/<setor>.md`) que entra no prompt de sistema do agente.
 
