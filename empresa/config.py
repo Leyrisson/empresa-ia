@@ -38,12 +38,20 @@ TIMEOUT_LLM = int(os.environ.get("EMPRESA_TIMEOUT_LLM", "240"))
 MODO_BUILD = os.environ.get("EMPRESA_MODO_BUILD", "opencode")
 TIMEOUT_BUILD = int(os.environ.get("EMPRESA_TIMEOUT_BUILD", "1800"))
 MAX_BUILDS_DIA = int(os.environ.get("EMPRESA_MAX_BUILDS_DIA", "6"))
+# A EMPRESA conduz: o arquiteto-chefe quebra o build em tarefas e o opencode
+# executa uma a uma; a empresa verifica (compila) e manda corrigir. Assim a
+# fábrica decide o processo — o opencode é só o braço que escreve o código.
+MAX_TAREFAS_BUILD = int(os.environ.get("EMPRESA_MAX_TAREFAS_BUILD", "4"))
+TIMEOUT_TAREFA = int(os.environ.get("EMPRESA_TIMEOUT_TAREFA", "600"))
 
 # --- Ritmo / nao atrapalhar ---
 # baixa: 20s entre ciclos | media: 8s | alta: 3s
 INTENSIDADE = os.environ.get("EMPRESA_INTENSIDADE", "baixa")
 SLEEP = {"baixa": 20.0, "media": 8.0, "alta": 3.0}.get(INTENSIDADE, 20.0)
-MAX_PRODUTOS_ATIVOS = int(os.environ.get("EMPRESA_MAX_PRODUTOS_ATIVOS", "3"))
+MAX_PRODUTOS_ATIVOS = int(os.environ.get("EMPRESA_MAX_PRODUTOS_ATIVOS", "1"))
+# Só projetos REAIS: o produto não avança do `build` enquanto não houver
+# código de verdade; e nenhum produto é marcado "lancado" sem código.
+EXIGIR_CODIGO = os.environ.get("EMPRESA_EXIGIR_CODIGO", "1") not in ("0", "false", "False")
 META_MRR = float(os.environ.get("EMPRESA_META_MRR", "10000"))
 NICE = int(os.environ.get("EMPRESA_NICE", "15"))
 

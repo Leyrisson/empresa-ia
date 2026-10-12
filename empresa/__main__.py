@@ -14,6 +14,12 @@ import sys
 import threading
 
 
+def _monitorar() -> int:
+    from . import monitor
+    monitor.executar()
+    return 0
+
+
 def _status() -> int:
     from . import agentes, db
     agentes.inicializar()
@@ -61,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
         return _status()
     elif cmd in ("doutor", "doctor"):
         return _doutor()
+    elif cmd in ("monitorar", "monitor"):
+        return _monitorar()
     elif cmd == "tudo":
         agentes.inicializar()
         t = threading.Thread(target=orquestrador.executar, daemon=True)

@@ -42,6 +42,18 @@ def _escrever(caminho: str, conteudo: str) -> bool:
     return True
 
 
+def _sobrescrever(caminho: str, conteudo: str) -> None:
+    """Sempre (re)escreve — para artefatos gerados que devem refletir o app atual.
+
+    Usado no `iniciar.sh`: se um build anterior deixou o app sem ponto de
+    entrada, o launcher antigo pode ter virado um `http.server` estático; ele
+    PRECISA ser regenerado quando o `app.py` aparece.
+    """
+    os.makedirs(os.path.dirname(caminho), exist_ok=True)
+    with open(caminho, "w", encoding="utf-8") as fh:
+        fh.write(conteudo)
+
+
 def _chmod_x(caminho: str) -> None:
     try:
         os.chmod(caminho, 0o755)
@@ -240,7 +252,7 @@ def _verificar_boot(p: dict) -> str:
             )
         except OSError:
             return "falha ao iniciar (permissão/ambiente)"
-        time.sleep(4)
+        time.sleep(9)
         ok = False
         try:
             with urllib.request.urlopen(
@@ -288,7 +300,7 @@ def empacotar_e_documentar(p: dict) -> str:
                   f"- Instalação: `docs/INSTALACAO.md`\n"
                   f"- Uso: `docs/USO.md`\n"
                   f"- Venda/instalação para clientes: `docs/VENDEDOR.md`\n")
-        _escrever(os.path.join(pasta, "iniciar.sh"), _iniciar_sh_web(p))
+        _sobrescrever(os.path.join(pasta, "iniciar.sh"), _iniciar_sh_web(p))
         _chmod_x(os.path.join(pasta, "iniciar.sh"))
         _escrever(os.path.join(pasta, ".env.example"),
                   "# Copie para .env e ajuste\nPORT=5000\n")

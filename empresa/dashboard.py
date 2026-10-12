@@ -144,6 +144,18 @@ class Handler(BaseHTTPRequestHandler):
                         "O dono pediu um novo produto sem nome definido — proponha!", tipo="demanda")
             return self._json({"ok": True, "pedido_extra": True})
 
+        if rota == "/api/produto/abrir":
+            pid = int(corpo.get("id") or 0)
+            p = db.produto(pid)
+            if not p:
+                return self._json({"erro": "produto não encontrado"}, 404)
+            from . import monitor
+            url = monitor.abrir(p)
+            if not url:
+                return self._json({"erro": f"não consegui abrir «{p['nome']}» "
+                                          "(sem app web ou falhou ao subir)"}, 502)
+            return self._json({"ok": True, "url": url})
+
         if rota == "/api/tick":
             # força uma rodada imediata em thread separada
             threading.Thread(target=agentes.ciclo_gerente, daemon=True).start()

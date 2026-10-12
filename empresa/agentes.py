@@ -6,13 +6,18 @@ Fluxo:
   manda relatorio ao gerente -> o gerente aprova, avanca o estagio e despacha o
   proximo. Ao passar por todos os estagios, o produto e marcado como 'lancado'.
 
-O desenvolvimento (estagio 'build') usa o opencode para ESCREVER o app de verdade.
+A EMPRESA conduz o processo: o arquiteto-chefe (setor de produto/arquitetura)
+quebra a construção em tarefas de programação, o opencode executa UMA tarefa por
+vez (é só o "braço" que escreve o código), e a empresa VERIFICA cada entrega
+(compila os .py) e manda corrigir quando reprova. Assim a fábrica decide o
+processo — o opencode não é a fábrica, é uma ferramenta dela.
 """
 from __future__ import annotations
 
 import json
 import os
 import re
+import subprocess
 import unicodedata
 
 from . import config, db, conhecimento, empacotar, llm, reuniao
@@ -164,7 +169,74 @@ def _despachar(p: dict, estagio: str) -> None:
     log(f"gerente -> {setor}: {estagio} / {p['nome']}")
 
 
+_EXT_CODIGO = (".py", ".js", ".ts", ".jsx", ".tsx", ".kt", ".java", ".swift",
+               ".gradle", ".dart", ".go", ".rb", ".rs", ".c", ".cpp", ".cs",
+               ".php", ".html", ".vue", ".svelte")
+
+
+def _tem_codigo(p: dict) -> bool:
+    """True se a pasta do produto tem código-fonte de verdade (não só .md)."""
+    pasta = p.get("pasta") or os.path.join(str(config.PRODUTOS), p.get("slug", ""))
+    if not os.path.isdir(pasta):
+        return False
+    for raiz, _dirs, arquivos in os.walk(pasta):
+        for a in arquivos:
+            if a.lower().endswith(_EXT_CODIGO):
+                return True
+    return False
+
+
+def _entry_web(pasta: str) -> str | None:
+    """Ponto de entrada ÚNICO do app web (na raiz da pasta), ou None."""
+    for nome in ("app.py", "server.py", "main.py", "index.html"):
+        if os.path.isfile(os.path.join(pasta, nome)):
+            return nome
+    return None
+
+
+def _tem_app(p: dict) -> bool:
+    """True se o produto tem app de verdade que ABRE (não só módulos soltos).
+
+    Android/iOS/outros: basta ter código. Web: precisa de um ponto de entrada
+    único na raiz (`app.py`/`server.py`/`main.py`/`index.html`).
+    """
+    if not _tem_codigo(p):
+        return False
+    if p.get("tipo") != "web":
+        return True
+    pasta = p.get("pasta") or os.path.join(str(config.PRODUTOS), p.get("slug", ""))
+    return _entry_web(pasta) is not None
+
+
 def _avancar(p: dict, tarefa: dict, parcial: bool = False) -> None:
+    # Regra "só projetos reais": não passa do build sem código de verdade E
+    # (para web) sem um ponto de entrada único que sobe o app inteiro.
+    if config.EXIGIR_CODIGO and p["estagio"] == "build" and not _tem_app(p):
+        pend = [t for t in db.tarefas_do_produto(p["id"])
+                if t["estagio"] == "build" and t["status"] in ("pendente", "em_andamento")]
+        if not pend and db.builds_hoje() < config.MAX_BUILDS_DIA:
+            setor = setor_do_estagio("build", p["tipo"])
+            db.criar_tarefa({
+                "produto_id": p["id"], "setor": setor, "estagio": "build",
+                "titulo": f"Construir o sistema: {p['nome']} (sem app que abre ainda)",
+                "descricao": (f"Produto: {p['nome']} ({p['tipo']})\nPitch: {p['pitch']}\n"
+                              "O build anterior não gerou um APP que abre. Para web, crie um "
+                              "ponto de entrada ÚNICO `app.py` na raiz que sobe com "
+                              "`python3 app.py`, ouve a porta PORT e serve a interface "
+                              "completa; integre as funcionalidades em vez de módulos soltos."),
+            })
+            db.mensagem(GERENTE, setor,
+                        f"«{p['nome']}» ainda sem app que abre — nova tentativa de build.",
+                        tipo="demanda", produto_id=p["id"])
+            log(f"build sem app; nova tentativa / {p['nome']}")
+        else:
+            db.mensagem(GERENTE, "todos",
+                        f"«{p['nome']}» segura no build: sem app que abre ainda "
+                        f"(builds hoje: {db.builds_hoje()}/{config.MAX_BUILDS_DIA}).",
+                        tipo="info", produto_id=p["id"])
+            log(f"build sem app; aguardando / {p['nome']}")
+        return
+
     resultado = (tarefa.get("resultado") or "")[:400]
     prox = proximo_estagio(p["estagio"])
     db.mensagem(GERENTE, "todos",
@@ -397,47 +469,212 @@ def _gerar_documento(setor: str, p: dict, tarefa: dict) -> str:
     return _resumo(resp)
 
 
+def _plano_padrao(p: dict) -> list[dict]:
+    """Plano mínimo quando o LLM não ajuda — a empresa ainda conduz a ordem."""
+    return [
+        {"titulo": "Estrutura e ponto de entrada",
+         "objetivo": "Criar o esqueleto do app: ponto de entrada que sobe e responde, "
+                     "com README explicando como rodar.",
+         "arquivos": ["app.py", "README.md"],
+         "pronto": "o app inicia e responde uma página"},
+        {"titulo": "Funcionalidades do MVP",
+         "objetivo": "Implementar as funcionalidades principais descritas na spec/pitch.",
+         "arquivos": ["app.py"],
+         "pronto": "o fluxo principal funciona de ponta a ponta"},
+        {"titulo": "Dados e persistência",
+         "objetivo": "Guardar os dados do MVP (SQLite ou arquivos) de forma persistente.",
+         "arquivos": ["app.py"],
+         "pronto": "os dados continuam após reiniciar o app"},
+        {"titulo": "Apresentação e monetização",
+         "objetivo": "Deixar a interface apresentável e expor a forma de lucro da spec.",
+         "arquivos": ["app.py", "templates/index.html"],
+         "pronto": "a tela principal está pronta e a forma de lucro aparece"},
+    ]
+
+
+def _plano_build(p: dict, contexto: str) -> list[dict]:
+    """A EMPRESA planeja: o arquiteto-chefe quebra a construção em tarefas."""
+    sistema = ("Você é o arquiteto-chefe de uma software house. Planeja o trabalho "
+               "para um engenheiro executar. Responda SEMPRE em JSON puro, em português.")
+    prompt = (
+        f"Produto: {p['nome']} ({p['tipo']})\nPitch: {p['pitch']}\n\n"
+        f"Materiais já produzidos pela empresa:\n{contexto}\n\n"
+        "REGRA DE OURO: é UM ÚNICO aplicativo. Para web, o ponto de entrada é "
+        "SEMPRE `app.py` na raiz da pasta — ele sobe com `python3 app.py`, ouve a "
+        "porta da variável de ambiente PORT e serve a interface completa. NÃO crie "
+        "apps/módulos separados com seus próprios servidores; as tarefas abaixo são "
+        "fatias incrementais do MESMO app (podem criar arquivos auxiliares importados "
+        "por app.py, mas quem roda tudo é o app.py).\n\n"
+        "Quebre a CONSTRUÇÃO do MVP em 3 a 5 tarefas de programação, em ordem de execução. "
+        "A PRIMEIRA tarefa deve criar o `app.py` que já sobe e responde uma página. "
+        "Cada tarefa deve ser executável por um engenheiro de forma independente. "
+        "NÃO escreva o código; só o plano. Responda no formato JSON:\n"
+        '{"tarefas":[{"titulo":"...","objetivo":"...","arquivos":["app.py"],'
+        '"pronto":"critério de aceite"}]}'
+    )
+    resp = llm.gerar(prompt, sistema=sistema, modelo=config.MODELO_PLANEJADOR,
+                     json_mode=True, num_predict=700, temperatura=0.5)
+    dados = llm.extrair_json(resp) or {}
+    plano = []
+    for t in dados.get("tarefas") or []:
+        if not isinstance(t, dict) or not str(t.get("titulo", "")).strip():
+            continue
+        plano.append({
+            "titulo": str(t["titulo"])[:80],
+            "objetivo": str(t.get("objetivo", ""))[:300],
+            "arquivos": [str(a) for a in (t.get("arquivos") or []) if isinstance(a, str)][:6],
+            "pronto": str(t.get("pronto", ""))[:160],
+        })
+    return plano or _plano_padrao(p)
+
+
+def _instrucao_tarefa(p: dict, t: dict, contexto: str, i: int, n: int) -> str:
+    arquivos = ", ".join(t.get("arquivos") or []) or "(conforme precisar)"
+    regra_app = ""
+    if p.get("tipo") == "web":
+        regra_app = (
+            "\nREGRA DE OURO (web): o produto é UM ÚNICO aplicativo. O ponto de entrada "
+            "é `app.py` na raiz e ele sobe com `python3 app.py`, ouvindo a porta da "
+            "variável PORT e servindo a interface web. NUNCA crie um app/servidor "
+            "separado com porta própria; se precisar de módulos, crie-os como arquivos "
+            "que o `app.py` importa. Garanta que, ao terminar, `python3 app.py` sobe e "
+            "responde uma página.\n"
+        )
+    return (
+        f"Você é o ENGENHEIRO da empresa «{p['nome']}» ({p['tipo']}). "
+        f"O arquiteto-chefe planejou {n} tarefa(s) e você executa SOMENTE a tarefa {i}.\n"
+        f"Tarefa {i}/{n}: {t['titulo']}\n"
+        f"Objetivo: {t.get('objetivo', '')}\n"
+        f"Arquivos: {arquivos}\n"
+        f"Pronto quando: {t.get('pronto', '')}\n"
+        f"{regra_app}\n"
+        f"Materiais já produzidos pela empresa:\n{contexto}\n\n"
+        "Execute só esta tarefa, de forma incremental, sem reescrever o que já funciona. "
+        "Ao final, diga em uma linha o que mudou e como rodar."
+    )
+
+
+def _verificar_codigo(pasta: str) -> str:
+    """A EMPRESA verifica (não o opencode): há código e os .py compilam? '' se ok."""
+    py, tem_codigo = [], False
+    for raiz, _d, fs in os.walk(pasta):
+        if "/." in raiz:
+            continue
+        for a in fs:
+            if a.lower().endswith(_EXT_CODIGO):
+                tem_codigo = True
+            if a.endswith(".py"):
+                py.append(os.path.join(raiz, a))
+    if not tem_codigo:
+        return "nenhum código-fonte encontrado (só texto/documentos)"
+    if not py:
+        return ""  # android/iOS/estático: sem .py para compilar, mas há código
+    try:
+        r = subprocess.run(["python3", "-m", "py_compile", *py],
+                           capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.TimeoutExpired) as e:  # noqa: BLE001
+        return f"falha ao compilar: {e}"
+    if r.returncode == 0:
+        return ""
+    ult = [l for l in (r.stderr or "").strip().splitlines() if l.strip()]
+    return ult[-1][:200] if ult else "erro de compilação"
+
+
 def _construir(p: dict, tarefa: dict) -> str:
     pasta = _pasta_produto(p)
-    spec = _ler_contexto(p)
-    if config.MODO_BUILD == "opencode":
-        if db.builds_hoje() >= config.MAX_BUILDS_DIA:
-            return (f"Limite de {config.MAX_BUILDS_DIA} builds/dia atingido; "
-                    "segue para teste com o que existe.")
-        instrucao = (
-            f"Você é o engenheiro de software da empresa. Construa um aplicativo "
-            f"{p['tipo']} funcional chamado «{p['nome']}».\n"
-            f"Objetivo: {p['pitch']}\n\n"
-            f"Especificação e materiais já produzidos:\n{spec}\n\n"
-            f"Requisitos: gere código real e completo (arquivos, README com instruções "
-            f"de execução), foque no MVP especificado e em formas de lucro. "
-            f"Trabalhe somente dentro desta pasta. Ao terminar, liste no final os "
-            f"arquivos criados."
-        )
-        ok, saida = llm.rodar_opencode(
-            instrucao, pasta, timeout=config.TIMEOUT_BUILD,
-            log_path=os.path.join(str(config.VAR), "builds.log"),
-        )
-        criados = _listar_arquivos(pasta)
-        _salvar(p, f"{ORDEM.index('build'):02d}-build-relatorio.md",
-                f"# Build de {p['nome']} ({p['tipo']})\n\n"
-                f"- modo: opencode\n- sucesso: {ok}\n- arquivos: {len(criados)}\n\n"
-                f"## Arquivos\n" + "\n".join(f"- {a}" for a in criados) +
-                f"\n\n## Saída do engenheiro\n\n```\n{saida[-2500:]}\n```\n")
-        if not ok and len(criados) <= 1:
-            raise RuntimeError("opencode não produziu arquivos")
-        pacote = ""
-        if config.EMPACOTAR:
-            try:
-                pacote = " | " + empacotar.empacotar_e_documentar(p)
-            except Exception as e:  # noqa: BLE001
-                pacote = f" | empacotamento falhou: {e}"
-                db.verificar(p["id"], "empacotar", False, str(e))
-        return f"App {'gerado' if ok else 'parcialmente gerado'} com {len(criados)} arquivo(s).{pacote}"
+    contexto = _ler_contexto(p)
 
-    # MODO_BUILD == "llm": pede os arquivos em JSON e escreve em disco
-    sistema = ("Você é um engenheiro. Responda SOMENTE JSON com a chave 'arquivos': "
-               "uma lista de objetos {path, conteudo}. Código completo e funcional.")
+    if config.MODO_BUILD != "opencode":
+        return _construir_por_llm(p, contexto)
+
+    if db.builds_hoje() >= config.MAX_BUILDS_DIA:
+        return (f"Limite de {config.MAX_BUILDS_DIA} builds/dia atingido; "
+                "produto fica retido no build até haver verba de build (não avança sem código).")
+
+    setor_dev = setor_do_estagio("build", p["tipo"])
+
+    # 1) A EMPRESA planeja (arquiteto-chefe) — quem decide o processo é a fábrica.
+    plano = _plano_build(p, contexto)[:config.MAX_TAREFAS_BUILD]
+    _salvar(p, f"{ORDEM.index('build'):02d}-plano-build.md",
+            f"# Plano de construção de {p['nome']}\n\n"
+            "Definido pela empresa (arquiteto-chefe) → executado pelo engenheiro (opencode).\n\n"
+            + "\n".join(f"- [ ] {i}. {t['titulo']} — {t.get('objetivo', '')}"
+                        for i, t in enumerate(plano, 1)) + "\n")
+    db.mensagem(GERENTE, setor_dev,
+                f"Plano de build de «{p['nome']}» definido em {len(plano)} tarefas.",
+                tipo="demanda", produto_id=p["id"])
+
+    # 2) opencode EXECUTA uma tarefa por vez; a EMPRESA verifica e manda corrigir
+    rel = []
+    for i, t in enumerate(plano, 1):
+        _status(setor_dev, "trabalhando", f"build {i}/{len(plano)}: {t['titulo']}")
+        instr = _instrucao_tarefa(p, t, contexto, i, len(plano))
+        llm.rodar_opencode(instr, pasta, timeout=config.TIMEOUT_TAREFA,
+                           log_path=os.path.join(str(config.VAR), "builds.log"))
+        defeito = _verificar_codigo(pasta)
+        tentativa = 1
+        while defeito and tentativa < 2:
+            db.verificar(p["id"], f"build-{i}", False, defeito)
+            corrigir = (f"{instr}\n\nA verificação da EMPRESA reprovou o resultado: "
+                        f"{defeito}\nCorrija exatamente esse problema.")
+            llm.rodar_opencode(corrigir, pasta, timeout=config.TIMEOUT_TAREFA,
+                               log_path=os.path.join(str(config.VAR), "builds.log"))
+            defeito = _verificar_codigo(pasta)
+            tentativa += 1
+        estado = "ok" if not defeito else f"pendência: {defeito}"
+        db.verificar(p["id"], f"build-{i}", not defeito, estado)
+        rel.append(f"- [{'x' if not defeito else ' '}] {i}. {t['titulo']} — {estado}")
+        log(f"build {i}/{len(plano)} {t['titulo']}: {estado}")
+
+    # 2b) A EMPRESA confere o ponto de entrada e manda CONSOLIDAR se faltar.
+    #     Sem `app.py` único, o produto não abre (vira listagem estática) — a
+    #     empresa exige o app integrado antes de dar o build por concluído.
+    if p["tipo"] == "web" and not _entry_web(pasta):
+        _status(setor_dev, "trabalhando", "consolidando o ponto de entrada (app.py)")
+        db.verificar(p["id"], "entrada-web", False, "sem app.py — mandando consolidar")
+        consolidar = (
+            f"A EMPRESA reprovou: «{p['nome']}» ficou como módulos soltos, SEM o ponto de "
+            "entrada único. Crie/ajuste `app.py` na RAIZ para ser a ÚNICA porta de entrada "
+            "do app inteiro: sobe com `python3 app.py`, ouve a porta da variável PORT, "
+            "serve a interface web (HTML/CSS/JS) e expõe as funcionalidades já "
+            "implementadas nos arquivos desta pasta (importe-os — NÃO reescreva o que já "
+            "funciona). Nada de apps/servidores separados. Ao final, `python3 app.py` "
+            "precisa subir e responder uma página."
+        )
+        llm.rodar_opencode(consolidar, pasta, timeout=config.TIMEOUT_TAREFA,
+                           log_path=os.path.join(str(config.VAR), "builds.log"))
+        entrada = _entry_web(pasta)
+        db.verificar(p["id"], "entrada-web", bool(entrada),
+                     entrada or "ainda sem ponto de entrada")
+        rel.append(f"- [{'x' if entrada else ' '}] consolidação: app.py único"
+                   + (f" ({entrada})" if entrada else " — ausente"))
+        log(f"build consolidação app.py: {'ok' if entrada else 'ausente'}")
+
+    criados = _listar_arquivos(pasta)
+    _salvar(p, f"{ORDEM.index('build'):02d}-build-relatorio.md",
+            f"# Build de {p['nome']} ({p['tipo']}) — empresa conduz, opencode executa\n\n"
+            "Tarefas planejadas pela empresa, executadas pelo opencode e verificadas "
+            "pela empresa:\n\n" + "\n".join(rel) +
+            f"\n\n## Arquivos ({len(criados)})\n" + "\n".join(f"- {a}" for a in criados) + "\n")
+    if not _tem_codigo(p):
+        raise RuntimeError("o build não produziu código real após o plano da empresa")
+    if p["tipo"] == "web" and not _tem_app(p):
+        raise RuntimeError("o build não produziu um app web com ponto de entrada único "
+                           "(app.py) — fica retido no build até abrir de verdade")
+    if config.EMPACOTAR:
+        try:
+            return (f"build conduzido em {len(plano)} tarefas; {len(criados)} arquivos. "
+                    + empacotar.empacotar_e_documentar(p))
+        except Exception as e:  # noqa: BLE001
+            db.verificar(p["id"], "empacotar", False, str(e))
+            return f"build em {len(plano)} tarefas (empacotamento falhou: {e})"
+    return f"build conduzido em {len(plano)} tarefas; {len(criados)} arquivos"
+
+
+def _construir_por_llm(p: dict, spec: str) -> str:
+    # MODO_BUILD == "llm": a empresa pede os arquivos em JSON e escreve em disco
+    sistema = ("Você é o time de desenvolvimento da empresa. Responda SOMENTE JSON com a "
+               "chave 'arquivos': uma lista de objetos {path, conteudo}. Código funcional.")
     prompt = (f"Crie um MVP de app {p['tipo']} chamado «{p['nome']}». Objetivo: {p['pitch']}.\n"
               f"Materiais:\n{spec}\n\n"
               "Gere de 3 a 8 arquivos com um MVP que roda (README incluso, com instruções "
@@ -445,9 +682,9 @@ def _construir(p: dict, tarefa: dict) -> str:
     resp = llm.gerar(prompt, sistema=sistema, modelo=config.MODELO_CODIGO,
                      json_mode=True, num_predict=1000, temperatura=0.4)
     dados = llm.extrair_json(resp) or {}
-    arquivos = dados.get("arquivos") or []
+    pasta = _pasta_produto(p)
     n = 0
-    for a in arquivos:
+    for a in dados.get("arquivos") or []:
         caminho = str(a.get("path", "")).lstrip("/")
         if not caminho or ".." in caminho:
             continue
@@ -460,8 +697,7 @@ def _construir(p: dict, tarefa: dict) -> str:
         _salvar(p, "README.md", f"# {p['nome']}\n\nMVP ainda não gerado (LLM indisponível).\n")
     if config.EMPACOTAR:
         try:
-            pacote = " | " + empacotar.empacotar_e_documentar(p)
-            return f"App gerado com {n} arquivo(s) (modo llm).{pacote}"
+            return f"App gerado com {n} arquivo(s) (modo llm). " + empacotar.empacotar_e_documentar(p)
         except Exception as e:  # noqa: BLE001
             db.verificar(p["id"], "empacotar", False, str(e))
             return f"App gerado com {n} arquivo(s) (modo llm; empacotamento falhou: {e})"

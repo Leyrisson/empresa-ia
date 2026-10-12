@@ -8,7 +8,9 @@ back-end, python, android, iOS, QA, growth e gerência). Você vê cada setor
 **trabalhando em sua sala no escritório** e, no celular, pode **pedir o
 escritório pelo Telegram** (resumo + foto).
 
-- Sem dependências externas de Python (só stdlib).
+- **Núcleo sem dependências externas de Python** (só stdlib). A **foto** pelo
+  Telegram (`/api/print/escritorio.png`) usa **Pillow** — único extra opcional,
+  carregado só nessa rota; sem ele o resto funciona igual.
 - Usa o **ollama** local para os agentes e o **opencode** para escrever o código
   de verdade dos apps.
 - Roda como serviço **systemd de usuário** com prioridade baixa (`nice`, I/O
@@ -36,6 +38,21 @@ Dashboard: **http://127.0.0.1:8770**
   é checado por boot HTTP, recebe `iniciar.sh`/`instalar.sh` (systemd),
   `Dockerfile`+`docker-compose.yml` (p/ vender para cliente) e documentação
   completa (`docs/INSTALACAO`, `USO`, `VENDEDOR`) — tudo registrado no banco.
+- **A empresa conduz, o opencode executa**: o arquiteto-chefe (LLM local) quebra
+  a construção em **3–5 tarefas** e o **opencode escreve o código uma tarefa por
+  vez**; a empresa **verifica** (compila os `.py`) e **manda corrigir** quando
+  reprova. O opencode é ferramenta da fábrica, não a fábrica.
+- **Só projetos reais (padrão)**: o produto **não passa do `build` enquanto não
+  houver código de verdade** e, para **web, um app que abra** (ponto de entrada
+  único `app.py`). O build tem uma etapa de **consolidação**: se o resultado
+  vier como módulos soltos, o opencode integra tudo num só `app.py`; se ainda
+  faltar, o produto **fica retido no `build`**. **Nenhum é marcado "lançado" no
+  papel**. Com `EMPRESA_MAX_PRODUTOS_ATIVOS=1`, a fábrica trabalha **um produto
+  por vez**.
+- **Monitor de build real** (`empresa monitorar`): avisa no **Telegram** e no PC
+  quando o build termina com código, **sobe o app** e manda o link. O link fica
+  salvo no produto e aparece no painel como **▶ Abrir** (aba Produtos); se o app
+  ainda não estiver rodando, o botão **▶ Rodar** sobe e abre.
 - **Agentes especialistas**: cada setor tem um manual de conhecimento
   (`conhecimento/<setor>.md`) que entra no prompt de sistema do agente.
 
@@ -101,7 +118,10 @@ No dashboard dá para **⏸ Pausar / ▶ Retomar**, mudar a **intensidade** e a
 | `EMPRESA_MODELO_CODIGO` | `qwen2.5-coder:1.5b` | dev web/android/iOS, backend, front-end, banco de dados, python e QA |
 | `EMPRESA_MODO_BUILD` | `opencode` | `opencode` (código real) ou `llm` |
 | `EMPRESA_INTENSIDADE` | `baixa` | intervalo entre ciclos (20/8/3 s) |
-| `EMPRESA_MAX_PRODUTOS_ATIVOS` | `3` | quantos produtos em paralelo |
+| `EMPRESA_MAX_PRODUTOS_ATIVOS` | `1` | produtos ativos ao mesmo tempo (1 = um por vez) |
+| `EMPRESA_EXIGIR_CODIGO` | `1` | só avança do `build` (e só "lança") com código real |
+| `EMPRESA_MAX_TAREFAS_BUILD` | `4` | em quantas tarefas a empresa quebra o build |
+| `EMPRESA_TIMEOUT_TAREFA` | `600` | teto (s) por tarefa do opencode |
 | `EMPRESA_MAX_BUILDS_DIA` | `6` | teto de builds com opencode por dia |
 | `EMPRESA_META_MRR` | `10000` | meta de receita recorrente (R$) |
 | `EMPRESA_HORA_RELATORIO` | `18` | hora do relatório diário (local) |
@@ -129,6 +149,7 @@ empresa-ia/
 │   ├── agentes.py      # gerente + funcionários
 │   ├── reuniao.py      # reuniões de setor (pauta → ata)
 │   ├── orquestrador.py # loop em segundo plano
+│   ├── monitor.py      # avisa (Telegram/PC) quando o build real termina
 │   └── dashboard.py    # servidor HTTP + API
 ├── conhecimento/       # manuais-mestres de cada setor
 ├── static/three.min.js # motor 3D (Three.js local)

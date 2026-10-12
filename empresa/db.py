@@ -285,6 +285,7 @@ def init() -> None:
     with conectar() as con:
         con.executescript(SCHEMA)
         _add_col(con, "produtos", "repo", "repo TEXT")
+        _add_col(con, "produtos", "url", "url TEXT")
         _add_col(con, "setores", "sala", "sala TEXT")
         _add_col(con, "ideias", "pitch_extra", "pitch_extra TEXT")
         _add_col(con, "office", "lx", "lx REAL")

@@ -600,9 +600,19 @@ function preencherProdutos(e){
     `<span class="pill" style="border-color:${porEst[es]?'#f5c542':'#333a52'}">${es} (${porEst[es]||0})</span>`).join('')+'</div>';
   const cores={ideia:'#4a5479',validacao:'#5b677d',spec:'#777f66',design:'#8a6f5b',build:'#7aa2f7',teste:'#b98eff',monetizacao:'#d9a441',lancamento:'#3ddc84'};
   el.innerHTML+=e.produtos.slice(0,40).map(p=>
-    `<div style="padding:8px 0; border-bottom:1px dashed var(--borda)"><b>${esc(p.nome)}</b> <span class="tag">${esc(p.tipo)}</span> <span class="tag">${esc(p.estagio)}</span>
+    `<div style="padding:8px 0; border-bottom:1px dashed var(--borda)"><b>${esc(p.nome)}</b> <span class="tag">${esc(p.tipo)}</span> <span class="tag">${esc(p.estagio)}</span> ${acaoAbrir(p)}
       <span class="pequeno">MRR ${p.mrr_estimado?'R$ '+Number(p.mrr_estimado).toLocaleString('pt-BR'):'—'}</span>
       <div class="est"><i style="width:${p.progresso||0}%; background:${cores[p.estagio]||'#f5c542'}"></i></div></div>`).join('');
+}
+function acaoAbrir(p){
+  if(p.tipo!=='web') return '<span class="tag">📱 app Android</span>';
+  if(p.url) return `<a class="tag" href="${esc(p.url)}" target="_blank" rel="noopener" style="border-color:#3ddc84;color:#3ddc84">▶ Abrir</a>`;
+  return `<button class="pequeno" onclick="abrirProduto(${p.id})">▶ Rodar</button>`;
+}
+async function abrirProduto(id){
+  const r=await api('/api/produto/abrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  if(r.url){window.open(r.url,'_blank');carregar();}
+  else alert(r.erro||'Não consegui abrir o sistema.');
 }
 function preencherTarefas(e){
   const el=$('#pgTarefas'); el.innerHTML='<h2>Tarefas (reservadas para cada setor)</h2>';
