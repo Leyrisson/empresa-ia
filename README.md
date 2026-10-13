@@ -48,7 +48,11 @@ Dashboard: **http://127.0.0.1:8770**
   vier como módulos soltos, o opencode integra tudo num só `app.py`; se ainda
   faltar, o produto **fica retido no `build`**. **Nenhum é marcado "lançado" no
   papel**. Com `EMPRESA_MAX_PRODUTOS_ATIVOS=1`, a fábrica trabalha **um produto
-  por vez**.
+  por vez** (a sua ideia fura a fila quando há ideia pendente).
+- **Só o que o dono pede** (`EMPRESA_SO_IDEIAS_DO_DONO=1`, padrão): a fábrica
+  constrói **apenas** as ideias que você registra na aba **💡 Ideias**. Sem ideia
+  na fila, o gerente **fica ocioso** — **não inventa produto** (nada de
+  "simulação"). Dá para religar a invenção automática com `=0`.
 - **Monitor de build real** (`empresa monitorar`): avisa no **Telegram** e no PC
   quando o build termina com código, **sobe o app** e manda o link. O link fica
   salvo no produto e aparece no painel como **▶ Abrir** (aba Produtos); se o app
@@ -127,6 +131,7 @@ No dashboard dá para **⏸ Pausar / ▶ Retomar**, mudar a **intensidade** e a
 | `EMPRESA_INTENSIDADE` | `baixa` | intervalo entre ciclos (20/8/3 s) |
 | `EMPRESA_MAX_PRODUTOS_ATIVOS` | `1` | produtos ativos ao mesmo tempo (1 = um por vez) |
 | `EMPRESA_EXIGIR_CODIGO` | `1` | só avança do `build` (e só "lança") com código real |
+| `EMPRESA_SO_IDEIAS_DO_DONO` | `1` | constrói só as ideias do dono; sem ideia, não inventa produto |
 | `EMPRESA_MAX_TAREFAS_BUILD` | `4` | em quantas tarefas a empresa quebra o build |
 | `EMPRESA_TIMEOUT_TAREFA` | `600` | teto (s) por tarefa do opencode |
 | `EMPRESA_MAX_BUILDS_DIA` | `6` | teto de builds com opencode por dia |

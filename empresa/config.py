@@ -52,6 +52,10 @@ MAX_PRODUTOS_ATIVOS = int(os.environ.get("EMPRESA_MAX_PRODUTOS_ATIVOS", "1"))
 # Só projetos REAIS: o produto não avança do `build` enquanto não houver
 # código de verdade; e nenhum produto é marcado "lancado" sem código.
 EXIGIR_CODIGO = os.environ.get("EMPRESA_EXIGIR_CODIGO", "1") not in ("0", "false", "False")
+# Só constrói o que o dono pede em "Ideias": sem ideia na fila, a fabrica NAO
+# inventa produto (nao gera "simulacoes"). O dono pode religar a invencao
+# automatica com EMPRESA_SO_IDEIAS_DO_DONO=0.
+SO_IDEIAS_DO_DONO = os.environ.get("EMPRESA_SO_IDEIAS_DO_DONO", "1") not in ("0", "false", "False")
 META_MRR = float(os.environ.get("EMPRESA_META_MRR", "10000"))
 NICE = int(os.environ.get("EMPRESA_NICE", "15"))
 

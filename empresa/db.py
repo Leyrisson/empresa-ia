@@ -506,6 +506,15 @@ def pegar_proxima_ideia() -> dict | None:
         return dict(r)
 
 
+def tem_ideia_na_fila() -> bool:
+    """True se ha ideia do dono esperando na fila (nao muda o status)."""
+    with conectar() as con:
+        r = con.execute(
+            "SELECT 1 FROM ideias WHERE status='fila' LIMIT 1"
+        ).fetchone()
+        return r is not None
+
+
 def concluir_ideia(iid: int, produto_id: int | None = None) -> None:
     with conectar() as con:
         con.execute(

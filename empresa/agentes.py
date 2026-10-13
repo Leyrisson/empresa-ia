@@ -103,11 +103,16 @@ def ciclo_gerente() -> None:
     for p in ativos:
         _processar_produto(p)
 
-    # capacidade livre? cria mais um produto
+    # capacidade livre? cria mais um produto. Ideia do dono fura o limite:
+    # se ha ideia na fila, criamos o produto mesmo com a capacidade cheia.
     ativos = [p for p in db.listar_produtos("ativo")]
-    if len(ativos) < config.MAX_PRODUTOS_ATIVOS:
+    if len(ativos) < config.MAX_PRODUTOS_ATIVOS or db.tem_ideia_na_fila():
         _contratar_novo_produto()
-    _status(GERENTE, "ocioso", None, "satisfeito" if ativos else "neutro")
+    ativos = [p for p in db.listar_produtos("ativo")]
+    if not ativos and config.SO_IDEIAS_DO_DONO and not db.tem_ideia_na_fila():
+        _status(GERENTE, "ocioso", "Aguardando ideia do dono", "neutro")
+    else:
+        _status(GERENTE, "ocioso", None, "satisfeito" if ativos else "neutro")
 
 
 def _processar_produto(p: dict) -> None:
@@ -286,10 +291,18 @@ def _contratar_novo_produto() -> None:
             "mrr_estimado": 0,
             "ideia_id": ideia["id"],
         }
+    elif config.SO_IDEIAS_DO_DONO:
+        # So construimos o que o dono pediu em "Ideias". Sem ideia na fila,
+        # a fabrica fica ociosa em vez de inventar produto (nada de "simulacao").
+        _status(GERENTE, "ocioso", "Sem ideias do dono na fila")
+        log("gerente: fila de ideias vazia; aguardando o dono")
+        return
     else:
         dados = _ideia_ia()
 
     if not dados or not dados.get("nome"):
+        if config.SO_IDEIAS_DO_DONO:
+            return
         dados = {
             "nome": "Painel de Assinaturas", "tipo": "web",
             "pitch": "Painel simples para pequenos negócios venderem assinaturas recorrentes.",
