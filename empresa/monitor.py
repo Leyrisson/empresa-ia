@@ -46,7 +46,7 @@ def _salvar(estado: dict) -> None:
 def _notificar(titulo: str, texto: str) -> None:
     relatorio.enviar_telegram(f"{titulo}\n\n{texto}")
     try:
-        subprocess.Popen(["notify-send", "-a", "Empresa IA", titulo, texto],
+        subprocess.Popen(["notify-send", "-a", "My AI Office", titulo, texto],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError:
         pass

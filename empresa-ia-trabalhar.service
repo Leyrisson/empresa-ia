@@ -1,5 +1,5 @@
 [Unit]
-Description=Empresa IA - turno de trabalho (agentes de IA em segundo plano)
+Description=My AI Office - turno de trabalho (agentes de IA em segundo plano)
 After=network-online.target
 Wants=network-online.target
 

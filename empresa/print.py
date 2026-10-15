@@ -59,9 +59,9 @@ def _suavizar(cor: str) -> str:
 
 def _cor_status(status: str) -> str:
     return {
-        "cumprindo": "#7ee787", "reuniao": "#e3b341", "viajando": "#79c0ff",
-        "apurado": "#ffa657", "ocioso": "#2a2e3a",
-    }.get(status, "#2a2e3a")
+        "trabalhando": "#3ddc84", "pensando": "#ff9f43", "ocioso": "#6b7a99",
+        "reuniao": "#f5c542",
+    }.get(status, "#6b7a99")
 
 
 def escritorio_png() -> bytes:
@@ -84,7 +84,7 @@ def escritorio_png() -> bytes:
 
     # cabecalho
     d.rectangle((0, 0, largura, _MARGEM_Y), fill="#10131b")
-    d.text((18, 16), "Escritório Empresa IA — " + db.agora()[:16], fill="#cdd3e0",
+    d.text((18, 16), "Escritório My AI Office — " + db.agora()[:16], fill="#cdd3e0",
            font=_fonte(20))
 
     # salas: chao + rotulo
@@ -108,18 +108,20 @@ def escritorio_png() -> bytes:
             d.rounded_rectangle((cx - 6, cy - 12, cx + 6, cy + 12), radius=3,
                                 fill=_cor(o["cor"], "#8a5a2b"), outline="#e8b765")
 
-    # agentes posicionados na cadeira do seu setor
+    # agentes na cadeira do setor, coloridos por status; fora do horario no posto
     setores = {s.get("id"): s for s in (est.get("setores") or [])}
+    funcs = est.get("funcionarios") or {}
     for o in office:
         if o["tipo"] != "cadeira" or not o.get("setor"):
             continue
         sid = o["setor"]
         s = setores.get(sid) or {}
+        f = funcs.get(sid) or {}
         cx, cy = proj(o["x"], o["z"])
-        cor = _cor(s.get("cor"), "#8f9bb3")
-        d.ellipse((cx - 14, cy - 14, cx + 14, cy + 14), fill=cor)
-        d.ellipse((cx - 19, cy - 19, cx + 19, cy + 19), outline="#2a2e3a", width=4)
-        d.text((cx, cy - 1), (s.get("nome") or sid)[0].upper(), fill="#0f1220",
+        cor = _cor_status(f.get("status") or "ocioso")
+        d.ellipse((cx - 15, cy - 15, cx + 15, cy + 15), fill=cor)
+        d.ellipse((cx - 15, cy - 15, cx + 15, cy + 15), outline="#0d1119", width=3)
+        d.text((cx, cy - 1), (s.get("nome") or sid)[0].upper(), fill="#0d1119",
                font=_fonte(15), anchor="mm")
 
     # sala de reuniao em andamento

@@ -1,4 +1,4 @@
-"""Configuracao da Empresa IA.
+"""Configuracao do My AI Office.
 
 Tudo sobrescrevivel por variavel de ambiente com prefixo EMPRESA_.
 Ex.: EMPRESA_MODELO_PLANEJADOR=llama3.1:latest
@@ -31,6 +31,8 @@ LOCALAI_URL = os.environ.get("EMPRESA_LOCALAI_URL", "http://127.0.0.1:8090")
 # Modelos 7B aqui rodam 95% na CPU a ~1,5 tok/s — evite como padrão.
 MODELO_PLANEJADOR = os.environ.get("EMPRESA_MODELO_PLANEJADOR", "qwen2.5:1.5b")
 MODELO_CODIGO = os.environ.get("EMPRESA_MODELO_CODIGO", "qwen2.5-coder:1.5b")
+# Só para gerar ideias (raríssimo, uma chamada por produto): pode ser maior.
+MODELO_IDEIA = os.environ.get("EMPRESA_MODELO_IDEIA", "llama3.1:latest")
 TIMEOUT_LLM = int(os.environ.get("EMPRESA_TIMEOUT_LLM", "240"))
 
 # --- opencode (braco que escreve codigo de verdade) ---
@@ -52,12 +54,50 @@ MAX_PRODUTOS_ATIVOS = int(os.environ.get("EMPRESA_MAX_PRODUTOS_ATIVOS", "1"))
 # Só projetos REAIS: o produto não avança do `build` enquanto não houver
 # código de verdade; e nenhum produto é marcado "lancado" sem código.
 EXIGIR_CODIGO = os.environ.get("EMPRESA_EXIGIR_CODIGO", "1") not in ("0", "false", "False")
-# Só constrói o que o dono pede em "Ideias": sem ideia na fila, a fabrica NAO
-# inventa produto (nao gera "simulacoes"). O dono pode religar a invencao
-# automatica com EMPRESA_SO_IDEIAS_DO_DONO=0.
-SO_IDEIAS_DO_DONO = os.environ.get("EMPRESA_SO_IDEIAS_DO_DONO", "1") not in ("0", "false", "False")
+# A fabrica pode inventar produto sozinha, MAS travada no dominio (abaixo).
+# Ideias do dono em "Ideias" continuam tendo prioridade absoluta. Trave a
+# invencao com EMPRESA_SO_IDEIAS_DO_DONO=1.
+SO_IDEIAS_DO_DONO = os.environ.get("EMPRESA_SO_IDEIAS_DO_DONO", "0") not in ("0", "false", "False")
 META_MRR = float(os.environ.get("EMPRESA_META_MRR", "10000"))
 NICE = int(os.environ.get("EMPRESA_NICE", "15"))
+
+# --- Dominio travado ---
+# A fabrica so produz software de infraestrutura de TI vendido a EMPRESAS.
+# `_no_dominio()` rejeita qualquer ideia fora desta lista de temas.
+DOMINIO = ("infraestrutura de TI, DevOps/AIOps, redes multi-fabricante "
+           "(Palo Alto, MikroTik, FortiGate, Cisco, Juniper), segurança, "
+           "GMUD/gestão de mudanças e auditoria ISO 27001/CIS")
+IDEIAS_DOMINIO: tuple[str, ...] = (
+    "inventário de rede multi-fabricante",
+    "backup e restauração de configuração de equipamentos",
+    "drift de configuração (comparar running vs. baseline)",
+    "monitoramento SNMP/syslog com correlação de eventos",
+    "painel de estado de links, interfaces e latência",
+    "gestão de mudanças (GMUD) com rollback",
+    "auditoria automática CIS Benchmark / ISO 27001",
+    "inventário de ativos e exposição de portas/serviços",
+    "gerador de relatório de disponibilidade e MTTR",
+    "assinatura e auditoria de política de firewall",
+    "inventário de licenças e garantias de hardware",
+    "checklist de onboarding/offboarding de equipamento",
+    "topologia de rede a partir de LLDP/CDP",
+    "gestão de vulnerabilidades e patch de firmware",
+    "coleta de NetFlow/sFlow e análise de tráfego",
+    "provisionamento automatizado de switch/router",
+    "certificados TLS e sua expiração",
+    "backup de rotas/firewall e diff entre janelas",
+    "inventário de servidores, containers e K8s",
+    "painel de saúde de MSP com multi-tenant",
+)
+# Palavras que, sozinhas, descartam a ideia (fora de dominio).
+FORA_DO_DOMINIO: tuple[str, ...] = (
+    "app pessoal", "e-commerce", "loja virtual", "delivery", "restaurante",
+    "agenda de cabeleireiro", "jogo", "redes sociais", "rede social", "social",
+    "dating", "encontro", "financ pessoal", "finanças pessoais", "criança",
+    "pet shop", "nft", "cripto", "aposta", "streaming", "musica", "música",
+    "receita de bolo", "viagem pessoal", "dieta", "academia", "marketplace",
+    "classificado", "portal de not", "blog pessoal", "fitness",
+)
 
 # --- Dashboard ---
 PORTA = int(os.environ.get("EMPRESA_PORTA", "8770"))

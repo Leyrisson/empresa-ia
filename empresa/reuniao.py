@@ -19,7 +19,13 @@ CICLOS_INICIO = int(os.environ.get("EMPRESA_REUNIAO_INICIO", "1"))
 DURACAO_CICLOS = int(os.environ.get("EMPRESA_REUNIAO_DURACAO", "2"))
 ENTRE_REUNIOES = int(os.environ.get("EMPRESA_REUNIAO_ENTRE", "5"))
 
-_TODOS = ["gerencia", "pesquisa", "produto", "dev_web", "dev_android", "qa", "financeiro", "marketing"]
+from .setores import ids_setores
+
+_TODOS = ["gerencia", "pesquisa", "produto", "vendas", "eng_redes", "dev_web",
+          "qa", "marketing", "financeiro"]
+
+_FALLBACK = ["gerencia", "pesquisa", "produto", "vendas", "qa", "marketing", "financeiro"]
+_validos = set(ids_setores())
 
 
 def _pauta_padrao() -> tuple[str, str, list[str]]:
@@ -35,9 +41,8 @@ def _pauta_padrao() -> tuple[str, str, list[str]]:
     else:
         titulo = f"Alinhamento de «{alvo['nome']}»"
         pauta = f"Discutir o estágio {alvo['estagio']} de {alvo['nome']} e destravar o pipeline."
-    # participantes: gerência + setores envolvidos
-    setor = "dev_android" if str(alvo["tipo"]).lower().startswith("android") else "dev_web"
-    part = ["gerencia", "pesquisa", "produto", setor, "qa", "marketing", "financeiro"]
+    # participantes: gerência + setores-chave (só ids que existem no organograma)
+    part = [s for s in _FALLBACK if s in _validos]
     return titulo, pauta, part
 
 

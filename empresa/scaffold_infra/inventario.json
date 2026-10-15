@@ -1,0 +1,22 @@
+{
+  "dispositivos": [
+    {
+      "nome": "fw-edge",
+      "fabricante": "simulado",
+      "host": "127.0.0.1",
+      "porta": 0,
+      "usuario": "admin",
+      "env_senha": "FW_EDGE_SENHA",
+      "extras": {}
+    },
+    {
+      "nome": "sw-core",
+      "fabricante": "simulado",
+      "host": "127.0.0.1",
+      "porta": 0,
+      "usuario": "admin",
+      "env_senha": "SW_CORE_SENHA",
+      "extras": {}
+    }
+  ]
+}

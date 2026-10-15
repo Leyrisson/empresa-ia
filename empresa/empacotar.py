@@ -78,7 +78,7 @@ def _iniciar_sh_web(p) -> str:
     else:
         cmd = f'exec python3 {entry}'
     return f"""#!/usr/bin/env bash
-# {p['nome']} — inicia a aplicação localmente (contrato Empresa IA)
+# {p['nome']} — inicia a aplicação localmente (contrato My AI Office)
 set -euo pipefail
 cd "$(dirname "$0")"
 export PORT="${{PORT:-5000}}"

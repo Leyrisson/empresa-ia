@@ -64,7 +64,14 @@ def _resumo_produtos() -> str:
     linhas = []
     for p in db.listar_produtos():
         st = _LABEL_ESTAGIO.get(p["estagio"], p["estagio"])
-        mrr = f" · R$ {p['mrr_estimado']:,.0f}/mês" if p.get("mrr_estimado") else ""
+        mrr = ""
+        if p.get("mrr_estimado"):
+            preco = p.get("mrr_preco") or 0
+            clientes = p.get("mrr_clientes") or 0
+            if preco and clientes:
+                mrr = f" · R$ {p['mrr_estimado']:,.0f}/mês ({preco:,.0f}×{clientes})"
+            else:
+                mrr = f" · R$ {p['mrr_estimado']:,.0f}/mês"
         linhas.append(f"- **{p['nome']}** ({p['tipo']}) — {st}{mrr}")
     return "\n".join(linhas) or "- (nenhum produto ainda)"
 
@@ -93,7 +100,7 @@ def montar() -> str:
     mrr_total = sum(p.get("mrr_estimado") or 0 for p in db.listar_produtos())
     ideias = [i for i in db.listar_ideias() if i["status"] == "fila"]
     texto = (
-        f"🏢 **Empresa IA — relatório {_hoje()}**\n\n"
+        f"🏢 **My AI Office — relatório {_hoje()}**\n\n"
         f"**Produtos ({len(db.listar_produtos())})**\n{_resumo_produtos()}\n\n"
         f"**Tarefas de hoje**\n{_resumo_tarefas_hoje()}\n\n"
         f"**Métricas**\n"

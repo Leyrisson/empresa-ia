@@ -1,18 +1,21 @@
-# Empresa IA — fábrica autônoma de software
+# My AI Office — fábrica autônoma de software de infraestrutura
 
 Uma "empresa" de agentes de IA que trabalha **em segundo plano** na sua máquina
-para criar sistemas **web, Android e iOS** com potencial de lucro. Tem um
-**gerente** e **17 setores** (pesquisa, produto, web designer, especialistas,
-auditoria, financeiro, banco de dados, dev web, web developer, front-end,
-back-end, python, android, iOS, QA, growth e gerência). Você vê cada setor
-**trabalhando em sua sala no escritório** e, no celular, pode **pedir o
-escritório pelo Telegram** (resumo + foto).
+para projetar, construir e entregar **software de infraestrutura de TI** para
+empresas — monitoramento de rede, observabilidade, gestão de mudanças (GMUD),
+conformidade (ISO 27001 / CIS), automação de operação (AIOps) e afins. Tem um
+**gerente** e **24 setores** (gerência, pesquisa, produto, web designer,
+front-end, dev web, back-end, banco de dados, dados & BI, ML & IA, QA, auditoria,
+plataforma, engenharia de redes, DevOps, AIOps, segurança & SOC, GMUD,
+compliance, automação, especialistas, marketing, vendas B2B e financeiro). Você
+vê cada setor **trabalhando na sua sala temática no escritório** e, no celular,
+pode **pedir o escritório pelo Telegram** (resumo + foto).
 
 - **Núcleo sem dependências externas de Python** (só stdlib). A **foto** pelo
   Telegram (`/api/print/escritorio.png`) usa **Pillow** — único extra opcional,
   carregado só nessa rota; sem ele o resto funciona igual.
 - Usa o **ollama** local para os agentes e o **opencode** para escrever o código
-  de verdade dos apps.
+  de verdade dos produtos.
 - Roda como serviço **systemd de usuário** com prioridade baixa (`nice`, I/O
   `idle`), então não atrapalha o uso normal do PC.
 
@@ -22,16 +25,28 @@ Dashboard: **http://127.0.0.1:8770**
 
 ## Destaques
 
-- **Escritório vivo**: uma **sala por equipe** (20 salas), com mesas, cadeiras,
-  sala de reunião e estantes. A vista **2D** é o padrão (leve, rola em qualquer
-  máquina); há uma **vista 3D** opcional em Three.js. Os agentes se movimentam
-  pelas salas e as **reuniões de setor** acontecem em tempo real (pauta → ata).
+- **Escritório vivo (3D padrão)**: uma **sala temática por setor** (racks, NOC,
+  SOC, mesas de reunião, copa, recepção), renderizada em **Three.js** local. Dê
+  **duplo-clique** numa sala para a câmera **voar até ela**. Há também a vista
+  **2D** opcional (leve, rola em qualquer máquina). Os agentes se movimentam e as
+  **reuniões de setor** acontecem em tempo real (pauta → ata).
+- **Camada de adaptadores multi-fabricante**: todo produto de infra nasce com a
+  pasta `dispositivos/` — um **simulador local** + adaptadores para **Palo Alto,
+  FortiGate e MikroTik** (mesmo contrato). O produto roda **100% no modo
+  simulado** (sem hardware) e, para operar gear real, é só preencher o inventário
+  e as credenciais (`.env`). Backup de config e **rollback à prova de falha** já
+  vêm prontos.
 - **Telegram**: do celular você consulta a fábrica — `/fabrica` (resumo),
   `/print` (foto ao vivo do escritório), `/projetos`, `/reuniao <pauta>`,
   `/pausar`, `/retomar`, `/relatorio`, `/ideia <texto>`. A foto é renderizada no
   servidor com Pillow (`/api/print/escritorio.png`), sem abrir navegador.
 - **Painel de ideias** (aba 💡 Ideias): você adiciona o produto que quer e o
-  gerente tira da **fila do dono** antes de o LLM inventar algo novo.
+  gerente tira da **fila do dono** antes de inventar algo novo.
+- **Motor de ideias travado no domínio**: por padrão a fábrica **inventa**
+  produtos, mas **só dentro do domínio** de infraestrutura de TI B2B — uma trava
+  por palavras-âncora rejeita ideias fora de escopo (app de consumo, rede social,
+  e-commerce…). Para construir **apenas** o que você pede, use
+  `EMPRESA_SO_IDEIAS_DO_DONO=1`.
 - **Relatório diário** no banco, no Obsidian (`EmpresaIA/`) e no seu Telegram
   (automático às 18h ou pelo botão "Relatório agora").
 - **Contrato "de verdade" por produto**: cada build compila (`py_compile`),
@@ -40,8 +55,9 @@ Dashboard: **http://127.0.0.1:8770**
   completa (`docs/INSTALACAO`, `USO`, `VENDEDOR`) — tudo registrado no banco.
 - **A empresa conduz, o opencode executa**: o arquiteto-chefe (LLM local) quebra
   a construção em **3–5 tarefas** e o **opencode escreve o código uma tarefa por
-  vez**; a empresa **verifica** (compila os `.py`) e **manda corrigir** quando
-  reprova. O opencode é ferramenta da fábrica, não a fábrica.
+  vez**; a empresa **verifica** (compila os `.py` **e** confere que a camada de
+  adaptadores existe) e **manda corrigir** quando reprova. O opencode é ferramenta
+  da fábrica, não a fábrica.
 - **Só projetos reais (padrão)**: o produto **não passa do `build` enquanto não
   houver código de verdade** e, para **web, um app que abra** (ponto de entrada
   único `app.py`). O build tem uma etapa de **consolidação**: se o resultado
@@ -49,10 +65,6 @@ Dashboard: **http://127.0.0.1:8770**
   faltar, o produto **fica retido no `build`**. **Nenhum é marcado "lançado" no
   papel**. Com `EMPRESA_MAX_PRODUTOS_ATIVOS=1`, a fábrica trabalha **um produto
   por vez** (a sua ideia fura a fila quando há ideia pendente).
-- **Só o que o dono pede** (`EMPRESA_SO_IDEIAS_DO_DONO=1`, padrão): a fábrica
-  constrói **apenas** as ideias que você registra na aba **💡 Ideias**. Sem ideia
-  na fila, o gerente **fica ocioso** — **não inventa produto** (nada de
-  "simulação"). Dá para religar a invenção automática com `=0`.
 - **Monitor de build real** (`empresa monitorar`): avisa no **Telegram** e no PC
   quando o build termina com código, **sobe o app** e manda o link. O link fica
   salvo no produto e aparece no painel como **▶ Abrir** (aba Produtos); se o app
@@ -73,19 +85,20 @@ Dashboard: **http://127.0.0.1:8770**
     Gerente (Aurélio)
         │  cria produto / despacha estágio / aprova relatório
         ▼
- Pesquisa → Produto → Web Designer → Banco de Dados → Dev → QA →
-  ideia     spec      visual          arquitetura       build  teste
-   Auditoria → Back-End → Front-End → Python → Especialista →
-    revisão     backend    frontend    automação   consultoria
-        ▼
-   Growth → Financeiro      (mercado → monetização)
-    preço    receita
+ Pesquisa (ideia, validação) → Produto (spec, design) → Web Designer (visual) →
+ Eng. de Redes (arquitetura) → Banco de Dados (esquema) → Dev Web (build) →
+ Plataforma (deploy) → DevOps (pipeline) → QA (teste) → Auditoria (revisão) →
+ Segurança (hardening) → GMUD (mudança) → Compliance (conformidade) →
+ AIOps (observabilidade) → ML (anomalia) → Dados & BI (métricas) →
+ Back-End → Front-End → Automação → Especialista (consultoria) →
+ Marketing (posicionamento) → Vendas (monetização) → Financeiro (lançamento)
         ▲                                   │
         └──────────── relatórios ───────────┘
 ```
 
-O estágio `build` é roteado pelo tipo do produto: **web** → Dev Web,
-**Android** → Desenvolvimento Android, **iOS** → iOS (Apple).
+Pipeline de **25 estágios** (de `ideia` a `lancamento`); o estágio `build` é
+roteado para **Dev Web** (os produtos de infra são web — painel/CLI com interface
+web).
 
 Cada setor tem um funcionário-agente. O gerente cria um produto, despacha o
 estágio atual para o setor responsável; o funcionário produz um **artefato em
@@ -125,13 +138,14 @@ No dashboard dá para **⏸ Pausar / ▶ Retomar**, mudar a **intensidade** e a
 | Variável | Padrão | Para quê |
 |---|---|---|
 | `EMPRESA_BACKEND` | `ollama` | `ollama`, `localai` ou `offline` |
-| `EMPRESA_MODELO_PLANEJADOR` | `qwen2.5:1.5b` | gerência, pesquisa, produto, design, auditoria, growth, financeiro |
-| `EMPRESA_MODELO_CODIGO` | `qwen2.5-coder:1.5b` | dev web/android/iOS, backend, front-end, banco de dados, python e QA |
+| `EMPRESA_MODELO_PLANEJADOR` | `qwen2.5:1.5b` | gerência, pesquisa, produto, design, auditoria, marketing, financeiro |
+| `EMPRESA_MODELO_CODIGO` | `qwen2.5-coder:1.5b` | dev web, back-end, front-end, banco de dados, automação e QA |
+| `EMPRESA_MODELO_IDEIA` | `llama3.1:latest` | inventar ideias de produto (travadas no domínio B2B) |
 | `EMPRESA_MODO_BUILD` | `opencode` | `opencode` (código real) ou `llm` |
 | `EMPRESA_INTENSIDADE` | `baixa` | intervalo entre ciclos (20/8/3 s) |
 | `EMPRESA_MAX_PRODUTOS_ATIVOS` | `1` | produtos ativos ao mesmo tempo (1 = um por vez) |
 | `EMPRESA_EXIGIR_CODIGO` | `1` | só avança do `build` (e só "lança") com código real |
-| `EMPRESA_SO_IDEIAS_DO_DONO` | `1` | constrói só as ideias do dono; sem ideia, não inventa produto |
+| `EMPRESA_SO_IDEIAS_DO_DONO` | `0` | `1` = só as ideias do dono; `0` = inventa (dentro do domínio) |
 | `EMPRESA_MAX_TAREFAS_BUILD` | `4` | em quantas tarefas a empresa quebra o build |
 | `EMPRESA_TIMEOUT_TAREFA` | `600` | teto (s) por tarefa do opencode |
 | `EMPRESA_MAX_BUILDS_DIA` | `6` | teto de builds com opencode por dia |
@@ -149,23 +163,27 @@ No dashboard dá para **⏸ Pausar / ▶ Retomar**, mudar a **intensidade** e a
 ```
 empresa-ia/
 ├── empresa/            # código Python (stdlib)
-│   ├── config.py       # configuração
+│   ├── config.py       # configuração + domínio de ideias
 │   ├── db.py           # SQLite: setores, produtos, tarefas, ideias, office
 │   ├── conhecimento.py # manuais de especialidade por setor
+│   ├── scaffold_infra/ # camada de adaptadores multi-fabricante (copiada em cada build)
+│   │   ├── dispositivos/  # base, simulador, paloalto, fortigate, routeros
+│   │   ├── inventario.json
+│   │   └── README.md
 │   ├── empacotar.py    # compilar/rodar/instalar/documentar cada produto
 │   ├── obsidian.py     # notas-resumo + relatórios no vault Obsidian
 │   ├── relatorio.py    # relatório diário → Telegram + Obsidian
 │   ├── print.py        # render PNG do escritório (foto p/ Telegram)
 │   ├── llm.py          # ollama/localai + braço opencode
-│   ├── setores.py      # organograma (17 setores) e pipeline (15 estágios)
-│   ├── agentes.py      # gerente + funcionários
+│   ├── setores.py      # organograma (24 setores), planta e pipeline (25 estágios)
+│   ├── agentes.py      # gerente + funcionários + motor de ideias
 │   ├── reuniao.py      # reuniões de setor (pauta → ata)
 │   ├── orquestrador.py # loop em segundo plano
 │   ├── monitor.py      # avisa (Telegram/PC) quando o build real termina
 │   └── dashboard.py    # servidor HTTP + API
 ├── conhecimento/       # manuais-mestres de cada setor
 ├── static/three.min.js # motor 3D (Three.js local)
-├── templates/escritorio.html   # a tela do escritório (2D + 3D + abas)
+├── templates/escritorio.html   # a tela do escritório (3D + 2D + abas)
 ├── produtos/<slug>/            # os apps e documentos gerados
 └── var/                        # banco, logs, arquivo PAUSA
 ```

@@ -1,5 +1,5 @@
 [Unit]
-Description=Empresa IA - dashboard do escritorio (http://127.0.0.1:8770)
+Description=My AI Office - dashboard do escritorio (http://127.0.0.1:8770)
 After=network-online.target
 
 [Service]

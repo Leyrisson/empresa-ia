@@ -1,4 +1,4 @@
-"""CLI da Empresa IA.
+"""CLI do My AI Office.
 
 Uso:
   python -m empresa servir        # só o dashboard (http://127.0.0.1:8770)
@@ -9,6 +9,7 @@ Uso:
   python -m empresa doutor        # checa backend/ollama/opencode
   python -m empresa servico       # cria/sobe serviço systemd dos produtos web
   python -m empresa servico <slug>  # só de um produto
+  python -m empresa mrr           # recalcula os MRR antigos pelo modelo realista
 """
 from __future__ import annotations
 
@@ -27,7 +28,7 @@ def _status() -> int:
     agentes.inicializar()
     s = db.snapshot()
     c = s["config"]
-    print(f"Empresa IA — backend={c['backend']} build={c['modo_build']} "
+    print(f"My AI Office — backend={c['backend']} build={c['modo_build']} "
           f"modelo={c['modelo_planejador']} intensidade={c['intensidade']} "
           f"pausada={c['pausada']} builds_hoje={c['builds_hoje']} tick={c['tick']}")
     print(f"\nSetores e funcionários:")
@@ -53,6 +54,25 @@ def _doutor() -> int:
     return 0
 
 
+def _mrr() -> int:
+    from . import agentes, db, monetizacao
+    agentes.inicializar()
+    mudados = 0
+    for p in db.listar_produtos():
+        mod = monetizacao.normalizar(p.get("mrr_estimado"), p.get("tipo"))
+        campos = {"mrr_estimado": mod["mrr_estimado"],
+                  "mrr_preco": mod["preco_mensal"],
+                  "mrr_clientes": mod["clientes_estimados"]}
+        antigo = p.get("mrr_estimado") or 0
+        if abs(antigo - mod["mrr_estimado"]) > 0.01 or not p.get("mrr_preco"):
+            db.atualizar_produto(p["id"], **campos)
+            mudados += 1
+            print(f"  {p['nome']:<40} R$ {antigo:,.0f} -> R$ {mod['mrr_estimado']:,.0f} "
+                  f"({mod['preco_mensal']:,.0f}×{mod['clientes_estimados']})")
+    print(f"MRR normalizado em {mudados} produto(s).")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     from . import agentes, config, dashboard, orquestrador
     args = argv if argv is not None else sys.argv[1:]
@@ -74,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
     elif cmd in ("servico", "servicos", "serviço", "service"):
         from . import servico
         return servico.executar(args[1] if len(args) > 1 else None)
+    elif cmd == "mrr":
+        return _mrr()
     elif cmd == "tudo":
         agentes.inicializar()
         t = threading.Thread(target=orquestrador.executar, daemon=True)

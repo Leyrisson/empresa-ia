@@ -187,98 +187,64 @@ def _add_col(con, tabela: str, coluna: str, ddl: str) -> None:
 
 
 def _sembrar_office(con) -> None:
-    """Planta baixa 2D do escritorio: salas por equipe + mobilia.
+    """Planta baixa do My AI Office, desseminada de `setores.PLANTA`.
 
-    Grid 4 colunas (x) x 5 fileiras (z). Cada sala e um retangulo (tipo 'sala')
-    com lx (profundidade em x) e lz (largura em z); carpetes/paredes/rotulos sao
-    derivados desses retangulos no dashboard.
+    Cada sala e um retangulo (tipo 'sala') com lx/lz; mobilia (mesas, cadeiras,
+    racks...) e derivada no dashboard. A coluna `tema` diz ao renderer 3D que
+    cenario montar (racks, NOC, firewall, reuniao...).
     """
+    from .setores import COL, LX_PADRAO, LZ_PADRAO, PLANTA, ROW
+
     n = con.execute("SELECT COUNT(*) c FROM office").fetchone()["c"]
     if n:
         return
-    # colunas (centro x) e fileiras (centro z) do grid
-    COL = {"c1": 1.7, "c2": 4.3, "c3": 6.9, "c4": 9.5}
-    ROW = {"r1": -5.7, "r2": -2.9, "r3": -0.1, "r4": 2.7, "r5": 5.5}
-
-    def sala(nome, col, row, cor="#2c3246"):
-        return (nome, "sala", COL[col], ROW[row], cor, None, 1.9, 2.55)
-
-    objs = [
-        # coluna 1 — administrativo
-        sala("Recepção", "c1", "r1", "#39405a"),
-        sala("Financeiro", "c1", "r2", "#463c26"),
-        sala("Marketing", "c1", "r3", "#463026"),
-        sala("Qualidade", "c1", "r4", "#2a2436"),
-        sala("Auditoria", "c1", "r5", "#3a2733"),
-        # coluna 2 — planejamento e dados
-        sala("Pesquisa", "c2", "r1", "#26374a"),
-        sala("Produto", "c2", "r2", "#2e3a4a"),
-        sala("Banco de Dados", "c2", "r3", "#2a3242"),
-        sala("Back-End", "c2", "r4", "#33353d"),
-        sala("Sala de Reunião", "c2", "r5", "#2f2a40"),
-        # coluna 3 — devs
-        sala("Dev Web", "c3", "r1", "#1f3a4a"),
-        sala("Dev Android", "c3", "r2", "#1f3a2e"),
-        sala("Front-End", "c3", "r3", "#20354a"),
-        sala("Python", "c3", "r4", "#3a351f"),
-        sala("Web Designer", "c3", "r5", "#3a2636"),
-        # coluna 4 — plataformas e gestão
-        sala("Web Developer", "c4", "r1", "#2c3a4a"),
-        sala("iOS (Apple)", "c4", "r2", "#382a3a"),
-        sala("Especialistas", "c4", "r3", "#2e3340"),
-        sala("Gerência", "c4", "r4", "#3f3a55"),
-        sala("Copa", "c4", "r5", "#3a3a2a"),
-    ]
-    # mesas (uma por sala de equipe; gerencia e recepcao maiores)
-    def mesa(nome, col, row, cor, setor, zoff=0.0):
-        objs.append((nome, "mesa", COL[col], ROW[row] + zoff, cor, setor, None, None))
-
-    mesa("Mesa do Gerente", "c4", "r4", "c8a94b", "gerencia")
-    mesa("Mesa de Reunião", "c2", "r5", "8e6f3f", None)
-    mesa("Mesa Recepção", "c1", "r1", "#5b9bd5", "recepcao")
-    mesa("Mesa Financeiro", "c1", "r2", "#ffc000", "financeiro")
-    mesa("Mesa Marketing", "c1", "r3", "#ed7d31", "marketing")
-    mesa("Mesa QA", "c1", "r4", "#7030a0", "qa")
-    mesa("Mesa Auditoria", "c1", "r5", "#ff8a65", "auditoria")
-    mesa("Mesa Pesquisa", "c2", "r1", "#4fc3f7", "pesquisa")
-    mesa("Mesa Produto", "c2", "r2", "#9575cd", "produto")
-    mesa("Mesa Banco de Dados", "c2", "r3", "#7986cb", "banco_dados")
-    mesa("Mesa Back-End", "c2", "r4", "#90a4ae", "backend")
-    mesa("Mesa Dev Web", "c3", "r1", "#81c784", "dev_web")
-    mesa("Mesa Dev Android", "c3", "r2", "#aed581", "dev_android")
-    mesa("Mesa Front-End", "c3", "r3", "#64b5f6", "frontend")
-    mesa("Mesa Python", "c3", "r4", "#ffd54f", "python")
-    mesa("Mesa Web Designer", "c3", "r5", "#f48fb1", "web_designer")
-    mesa("Mesa Web Developer", "c4", "r1", "#aed581", "web_developer")
-    mesa("Mesa iOS", "c4", "r2", "#ce93d8", "ios")
-    mesa("Mesa Especialistas", "c4", "r3", "#b0bec5", "especialista")
-    mesa("Mesinha da Copa", "c4", "r5", "#8a7238", "copa")
-    # cadeiras ao lado de cada mesa (offset em x -> 'atras' dela)
-    for setor in [
-        "gerencia", "recepcao", "financeiro", "marketing", "qa", "auditoria",
-        "pesquisa", "produto", "banco_dados", "backend", "dev_web", "dev_android",
-        "frontend", "python", "web_designer", "web_developer", "ios", "especialista",
-    ]:
-        reg = next(o for o in objs if o[5] == setor and o[1] == "mesa")
-        objs.append((f"Cadeira {setor}", "cadeira", reg[2] - 0.8, reg[3], "#c7c7c7", setor, None, None))
-    objs.append(("Poltrona Copa 1", "cadeira", 9.1, 5.0, "#9aa0b4", "copa", None, None))
-    objs.append(("Poltrona Copa 2", "cadeira", 9.9, 6.0, "#9aa0b4", "copa", None, None))
-    # arquivos — estante de projetos na borda esquerda
-    for i, zz in enumerate([-6.6, -4.4, -2.2, 0.0]):
-        objs.append((f"Arquivo {i+1}", "arquivo", 0.7, zz, "#8a5a2b", None, None, None))
-    for nome, tipo, x, z, cor, setor, lx, lz in objs:
+    objs: list[tuple] = []
+    for sala in PLANTA:
+        if "x" in sala:
+            x, z = sala["x"], sala["z"]
+        else:
+            x, z = COL[sala["col"]], ROW[sala["row"]]
+        lx = sala.get("lx", LX_PADRAO)
+        lz = sala.get("lz", LZ_PADRAO)
+        objs.append((sala["nome"], "sala", x, z, sala["cor"], sala.get("setor"),
+                     lx, lz, sala["tema"]))
+        if sala.get("setor"):
+            objs.append((f"Mesa {sala['nome']}", "mesa", x, z, "#c8a94b",
+                         sala["setor"], None, None, sala["tema"]))
+            objs.append((f"Cadeira {sala['setor']}", "cadeira", x - 0.8, z,
+                         "#c7c7c7", sala["setor"], None, None, sala["tema"]))
+    for nome, tipo, x, z, cor, setor, lx, lz, tema in objs:
         con.execute(
-            "INSERT INTO office(nome,tipo,x,y,z,rot,cor,setor,estado,lx,lz) "
-            "VALUES(?,?,?,0,?,0,?,?, 'livre', ?,?)",
-            (nome, tipo, x, z, cor, setor, lx, lz),
+            "INSERT INTO office(nome,tipo,x,y,z,rot,cor,setor,estado,lx,lz,tema) "
+            "VALUES(?,?,?,0,?,0,?,?, 'livre', ?,?,?)",
+            (nome, tipo, x, z, cor, setor, lx, lz, tema),
         )
-    con.execute("INSERT OR REPLACE INTO config(chave,valor) VALUES('office_versao',?)", ("3",))
+    con.execute("INSERT OR REPLACE INTO config(chave,valor) VALUES('office_versao',?)", ("4",))
 
 
-def _add_col(con, tabela: str, coluna: str, ddl: str) -> None:
-    cols = [r["name"] for r in con.execute(f"PRAGMA table_info({tabela})")]
-    if coluna not in cols:
-        con.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {ddl}")
+ORGANOGRAMA_VERSAO = "3"
+
+
+def _migrar_organograma(con) -> None:
+    """Remove setores/funcionarios que sairam do organograma (rebranding).
+
+    Produtos, tarefas, mensagens e historico NUNCA sao apagados: apenas os
+    agentes de setores descontinuados deixam de existir.
+    """
+    from .setores import ids_setores
+
+    validos = set(ids_setores())
+    v = con.execute("SELECT valor FROM config WHERE chave='organograma_versao'").fetchone()
+    if (v and v["valor"]) == ORGANOGRAMA_VERSAO:
+        return
+    ids = ",".join("?" for _ in validos) or "''"
+    removidos = [r["id"] for r in con.execute(
+        f"SELECT id FROM setores WHERE id NOT IN ({ids})", tuple(validos))]
+    if removidos:
+        con.execute(f"DELETE FROM setores WHERE id NOT IN ({ids})", tuple(validos))
+        con.execute(f"DELETE FROM funcionarios WHERE setor NOT IN ({ids})", tuple(validos))
+    con.execute("INSERT OR REPLACE INTO config(chave,valor) VALUES('organograma_versao',?)",
+                (ORGANOGRAMA_VERSAO,))
 
 
 def init() -> None:
@@ -286,13 +252,17 @@ def init() -> None:
         con.executescript(SCHEMA)
         _add_col(con, "produtos", "repo", "repo TEXT")
         _add_col(con, "produtos", "url", "url TEXT")
+        _add_col(con, "produtos", "mrr_preco", "mrr_preco REAL DEFAULT 0")
+        _add_col(con, "produtos", "mrr_clientes", "mrr_clientes INTEGER DEFAULT 0")
         _add_col(con, "setores", "sala", "sala TEXT")
         _add_col(con, "ideias", "pitch_extra", "pitch_extra TEXT")
         _add_col(con, "office", "lx", "lx REAL")
         _add_col(con, "office", "lz", "lz REAL")
+        _add_col(con, "office", "tema", "tema TEXT")
+        _migrar_organograma(con)
         _sembrar_office(con)
         v = con.execute("SELECT valor FROM config WHERE chave='office_versao'").fetchone()
-        if (v and v["valor"]) != "3":
+        if (v and v["valor"]) != "4":
             con.execute("DELETE FROM office")
             _sembrar_office(con)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Atalho para controlar a Empresa IA.
+# Atalho para controlar o My AI Office.
 #   ./empresa.sh trabalhar   -> turno em segundo plano (normalmente via systemd)
 #   ./empresa.sh servir      -> dashboard em http://127.0.0.1:8770
 #   ./empresa.sh tudo        -> dashboard + turno no mesmo processo

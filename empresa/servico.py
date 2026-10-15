@@ -123,7 +123,7 @@ def _texto_unidade(p: dict, porta: int) -> str:
     var_porta = p["slug"].upper().replace("-", "_")
     return (
         "[Unit]\n"
-        f"Description=Empresa IA - produto {p['slug']} ({p.get('tipo', 'web')})\n"
+        f"Description=My AI Office - produto {p['slug']} ({p.get('tipo', 'web')})\n"
         "After=network.target\n\n"
         "[Service]\n"
         "Type=simple\n"

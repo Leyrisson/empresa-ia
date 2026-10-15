@@ -23,9 +23,9 @@ def _indice() -> str:
     projetos = (config.OBSIDIAN_EMPRESA / "projetos").glob("*.md")
     relatorios = sorted(
         (config.OBSIDIAN_EMPRESA / "relatorios").glob("*.md"), reverse=True)
-    linhas = ["---", "projeto: EmpresaIA", "tags: [empresa-ia, escrever-codigo]",
+    linhas = ["---", "projeto: My AI Office", "tags: [my-ai-office, escrever-codigo]",
               "ultima_atualizacao: " + time.strftime("%Y-%m-%d") + "", "---", "",
-              "# Empresa IA — relatórios e projetos", "",
+              "# My AI Office — relatórios e projetos", "",
               "Escritório ao vivo em `http://127.0.0.1:8770`.", "",
               "## Relatórios", ""]
     linhas += ["- [[EmpresaIA/relatorios/" + r.stem + "|" + r.stem + "]]"
@@ -53,14 +53,17 @@ def escrever_resumo_produto(p: dict) -> str:
     base = config.OBSIDIAN_EMPRESA / "projetos"
     base.mkdir(parents=True, exist_ok=True)
     slug = p["slug"]
+    mrr_linha = f"MRR estimado R$ {p.get('mrr_estimado',0):,.0f}"
+    if p.get("mrr_preco") and p.get("mrr_clientes"):
+        mrr_linha += f" ({p['mrr_preco']:,.0f}/cliente × {p['mrr_clientes']} clientes)"
     conteudo = (
         _yaml(p["nome"], ["empresa-ia", "produto"], p["estagio"]) +
         f"# {p['nome']} ({p['tipo']})\n\n"
         f"**Pitch:** {p.get('pitch','')}\n\n"
         f"**Estágio:** `{p['estagio']}` · progresso {p.get('progresso',0)}% · "
-        f"MRR estimado R$ {p.get('mrr_estimado',0):,.0f}\n\n"
+        f"{mrr_linha}\n\n"
         f"{_bloco_tarefas(p)}\n"
-        f"## Atualizado\nAtualização automática em {time.strftime('%Y-%m-%d')} pela Empresa IA.\n\n"
+        f"## Atualizado\nAtualização automática em {time.strftime('%Y-%m-%d')} pelo My AI Office.\n\n"
         f"## Relacionados\n"
         f"- [[Empresa IA - Fábrica Autônoma de Software]] — quem criou este produto.\n"
         f"- [[EmpresaIA/_Índice]] — demais relatórios e produtos.\n"

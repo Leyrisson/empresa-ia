@@ -210,7 +210,7 @@ def servir(host: str | None = None, porta: int | None = None) -> None:
     db.init()
     servidor = ThreadingHTTPServer((host, porta), Handler)
     agentes.log(f"dashboard em http://{host}:{porta}")
-    print(f"Dashboard da Empresa IA -> http://{host}:{porta}", flush=True)
+    print(f"Dashboard do My AI Office -> http://{host}:{porta}", flush=True)
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:
